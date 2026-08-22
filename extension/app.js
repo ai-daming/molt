@@ -26,6 +26,15 @@
 // All open tabs — populated by fetchOpenTabs()
 let openTabs = [];
 
+// Browser-builtin new-tab URLs across Chromium variants (Chrome, Edge,
+// Brave). The extension page URL itself is also treated as Tab Out.
+const BROWSER_NEWTAB_URLS = [
+  'chrome://newtab/',
+  'edge://newtab/',
+  'brave://newtab/',
+  'about:newtab',
+];
+
 /**
  * fetchOpenTabs()
  *
@@ -46,7 +55,7 @@ async function fetchOpenTabs() {
       windowId: t.windowId,
       active:   t.active,
       // Flag Tab Out's own pages so we can detect duplicate new tabs
-      isTabOut: t.url === newtabUrl || t.url === 'chrome://newtab/',
+      isTabOut: t.url === newtabUrl || BROWSER_NEWTAB_URLS.includes(t.url),
     }));
   } catch {
     // chrome.tabs API unavailable (shouldn't happen in an extension page)
@@ -57,50 +66,15 @@ async function fetchOpenTabs() {
 /**
  * closeTabsByUrls(urls)
  *
- * Closes all open tabs whose hostname matches any of the given URLs.
- * After closing, re-fetches the tab list to keep our state accurate.
+ * Closes open tabs that exactly match one of the given URLs.
  *
- * Special case: file:// URLs are matched exactly (they have no hostname).
+ * Previously this matched by hostname, which would also close tabs the
+ * user never saw — e.g. closing a domain card would take down the
+ * corresponding homepage tab that had been split into the Homepages
+ * group. Exact-URL matching keeps the action scoped to what the card
+ * actually shows and still closes every duplicate tab for each URL.
  */
 async function closeTabsByUrls(urls) {
-  if (!urls || urls.length === 0) return;
-
-  // Separate file:// URLs (exact match) from regular URLs (hostname match)
-  const targetHostnames = [];
-  const exactUrls = new Set();
-
-  for (const u of urls) {
-    if (u.startsWith('file://')) {
-      exactUrls.add(u);
-    } else {
-      try { targetHostnames.push(new URL(u).hostname); }
-      catch { /* skip unparseable */ }
-    }
-  }
-
-  const allTabs = await chrome.tabs.query({});
-  const toClose = allTabs
-    .filter(tab => {
-      const tabUrl = tab.url || '';
-      if (tabUrl.startsWith('file://') && exactUrls.has(tabUrl)) return true;
-      try {
-        const tabHostname = new URL(tabUrl).hostname;
-        return tabHostname && targetHostnames.includes(tabHostname);
-      } catch { return false; }
-    })
-    .map(tab => tab.id);
-
-  if (toClose.length > 0) await chrome.tabs.remove(toClose);
-  await fetchOpenTabs();
-}
-
-/**
- * closeTabsExact(urls)
- *
- * Closes tabs by exact URL match (not hostname). Used for landing pages
- * so closing "Gmail inbox" doesn't also close individual email threads.
- */
-async function closeTabsExact(urls) {
   if (!urls || urls.length === 0) return;
   const urlSet = new Set(urls);
   const allTabs = await chrome.tabs.query({});
@@ -181,7 +155,7 @@ async function closeTabOutDupes() {
   const allTabs = await chrome.tabs.query({});
   const currentWindow = await chrome.windows.getCurrent();
   const tabOutTabs = allTabs.filter(t =>
-    t.url === newtabUrl || t.url === 'chrome://newtab/'
+    t.url === newtabUrl || BROWSER_NEWTAB_URLS.includes(t.url)
   );
 
   if (tabOutTabs.length <= 1) return;
@@ -195,6 +169,39 @@ async function closeTabOutDupes() {
   const toClose = tabOutTabs.filter(t => t.id !== keep.id).map(t => t.id);
   if (toClose.length > 0) await chrome.tabs.remove(toClose);
   await fetchOpenTabs();
+}
+
+
+/* ----------------------------------------------------------------
+   THEME SWITCHER
+
+   Four color palettes the user can cycle through (warm / midnight /
+   arctic / forest). The active theme is written to localStorage and
+   re-applied on load by theme-init.js before the body paints, so the
+   page doesn't flash the default palette. This function only has to
+   sync the DOM state and the pressed-button indicator.
+   ---------------------------------------------------------------- */
+const THEMES = ['warm', 'midnight', 'arctic', 'forest'];
+const THEME_STORAGE_KEY = 'tab-out-theme';
+
+function getActiveTheme() {
+  const t = document.documentElement.dataset.theme;
+  return THEMES.includes(t) ? t : 'warm';
+}
+
+function applyTheme(name, { save = false } = {}) {
+  if (!THEMES.includes(name)) return;
+  document.documentElement.dataset.theme = name;
+  if (save) {
+    try { localStorage.setItem(THEME_STORAGE_KEY, name); } catch {}
+  }
+  document.querySelectorAll('.theme-btn[data-theme-name]').forEach(btn => {
+    btn.setAttribute('aria-pressed', btn.dataset.themeName === name ? 'true' : 'false');
+  });
+}
+
+function initThemeSwitcher() {
+  applyTheme(getActiveTheme(), { save: false });
 }
 
 
@@ -515,6 +522,33 @@ function getDateDisplay() {
 
 
 /* ----------------------------------------------------------------
+   HTML ESCAPE — prevents XSS when tab titles/URLs are injected into
+   innerHTML. Tab titles come from arbitrary web pages, so they must
+   be treated as untrusted input.
+   ---------------------------------------------------------------- */
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Only allow http/https/file as href targets, so a saved tab with a
+// javascript: URL can't execute script when clicked.
+function isSafeNavUrl(url) {
+  if (!url) return false;
+  try {
+    const scheme = new URL(url).protocol;
+    return scheme === 'http:' || scheme === 'https:' || scheme === 'file:';
+  } catch {
+    return false;
+  }
+}
+
+
+/* ----------------------------------------------------------------
    DOMAIN & TITLE CLEANUP HELPERS
    ---------------------------------------------------------------- */
 
@@ -763,14 +797,14 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
     const count    = urlCounts[tab.url] || 1;
     const dupeTag  = count > 1 ? ` <span class="chip-dupe-badge">(${count}x)</span>` : '';
     const chipClass = count > 1 ? ' chip-has-dupes' : '';
-    const safeUrl   = (tab.url || '').replace(/"/g, '&quot;');
-    const safeTitle = label.replace(/"/g, '&quot;');
+    const safeUrl   = escapeHtml(tab.url || '');
+    const safeTitle = escapeHtml(label);
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
-    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
+    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` : '';
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
-      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
-      <span class="chip-text">${label}</span>${dupeTag}
+      ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
+      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
@@ -844,14 +878,14 @@ function renderDomainCard(group) {
     const count    = urlCounts[tab.url];
     const dupeTag  = count > 1 ? ` <span class="chip-dupe-badge">(${count}x)</span>` : '';
     const chipClass = count > 1 ? ' chip-has-dupes' : '';
-    const safeUrl   = (tab.url || '').replace(/"/g, '&quot;');
-    const safeTitle = label.replace(/"/g, '&quot;');
+    const safeUrl   = escapeHtml(tab.url || '');
+    const safeTitle = escapeHtml(label);
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
-    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
+    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` : '';
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
-      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
-      <span class="chip-text">${label}</span>${dupeTag}
+      ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
+      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
@@ -966,22 +1000,25 @@ async function renderDeferredColumn() {
 function renderDeferredItem(item) {
   let domain = '';
   try { domain = new URL(item.url).hostname.replace(/^www\./, ''); } catch {}
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
+  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` : '';
   const ago = timeAgo(item.savedAt);
+  const safeId    = escapeHtml(item.id);
+  const safeUrl   = escapeHtml(isSafeNavUrl(item.url) ? item.url : '#');
+  const safeTitle = escapeHtml(item.title || item.url || '');
 
   return `
-    <div class="deferred-item" data-deferred-id="${item.id}">
-      <input type="checkbox" class="deferred-checkbox" data-action="check-deferred" data-deferred-id="${item.id}">
+    <div class="deferred-item" data-deferred-id="${safeId}">
+      <input type="checkbox" class="deferred-checkbox" data-action="check-deferred" data-deferred-id="${safeId}">
       <div class="deferred-info">
-        <a href="${item.url}" target="_blank" rel="noopener" class="deferred-title" title="${(item.title || '').replace(/"/g, '&quot;')}">
-          <img src="${faviconUrl}" alt="" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" onerror="this.style.display='none'">${item.title || item.url}
+        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="deferred-title" title="${safeTitle}">
+          ${faviconUrl ? `<img src="${escapeHtml(faviconUrl)}" alt="" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px">` : ''}${safeTitle}
         </a>
         <div class="deferred-meta">
-          <span>${domain}</span>
-          <span>${ago}</span>
+          <span>${escapeHtml(domain)}</span>
+          <span>${escapeHtml(ago)}</span>
         </div>
       </div>
-      <button class="deferred-dismiss" data-action="dismiss-deferred" data-deferred-id="${item.id}" title="Dismiss">
+      <button class="deferred-dismiss" data-action="dismiss-deferred" data-deferred-id="${safeId}" title="Dismiss">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
       </button>
     </div>`;
@@ -994,12 +1031,14 @@ function renderDeferredItem(item) {
  */
 function renderArchiveItem(item) {
   const ago = item.completedAt ? timeAgo(item.completedAt) : timeAgo(item.savedAt);
+  const safeUrl   = escapeHtml(isSafeNavUrl(item.url) ? item.url : '#');
+  const safeTitle = escapeHtml(item.title || item.url || '');
   return `
     <div class="archive-item">
-      <a href="${item.url}" target="_blank" rel="noopener" class="archive-item-title" title="${(item.title || '').replace(/"/g, '&quot;')}">
-        ${item.title || item.url}
+      <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="archive-item-title" title="${safeTitle}">
+        ${safeTitle}
       </a>
-      <span class="archive-item-date">${ago}</span>
+      <span class="archive-item-date">${escapeHtml(ago)}</span>
     </div>`;
 }
 
@@ -1188,6 +1227,13 @@ document.addEventListener('click', async (e) => {
 
   const action = actionEl.dataset.action;
 
+  // ---- Switch color theme ----
+  if (action === 'set-theme') {
+    const name = actionEl.dataset.themeName;
+    if (name) applyTheme(name, { save: true });
+    return;
+  }
+
   // ---- Close duplicate Tab Out tabs ----
   if (action === 'close-tabout-dupes') {
     await closeTabOutDupes();
@@ -1227,10 +1273,11 @@ document.addEventListener('click', async (e) => {
     const tabUrl = actionEl.dataset.tabUrl;
     if (!tabUrl) return;
 
-    // Close the tab in Chrome directly
+    // The chip represents a URL (possibly with an "(Nx)" duplicate badge),
+    // so close every tab with that exact URL, not just the first one found.
     const allTabs = await chrome.tabs.query({});
-    const match   = allTabs.find(t => t.url === tabUrl);
-    if (match) await chrome.tabs.remove(match.id);
+    const ids     = allTabs.filter(t => t.url === tabUrl).map(t => t.id);
+    if (ids.length > 0) await chrome.tabs.remove(ids);
     await fetchOpenTabs();
 
     playCloseSound();
@@ -1280,10 +1327,10 @@ document.addEventListener('click', async (e) => {
       return;
     }
 
-    // Close the tab in Chrome
+    // Close every tab with that exact URL so duplicates also go away.
     const allTabs = await chrome.tabs.query({});
-    const match   = allTabs.find(t => t.url === tabUrl);
-    if (match) await chrome.tabs.remove(match.id);
+    const ids     = allTabs.filter(t => t.url === tabUrl).map(t => t.id);
+    if (ids.length > 0) await chrome.tabs.remove(ids);
     await fetchOpenTabs();
 
     // Animate chip out
@@ -1348,16 +1395,8 @@ document.addEventListener('click', async (e) => {
     });
     if (!group) return;
 
-    const urls      = group.tabs.map(t => t.url);
-    // Landing pages and custom groups (whose domain key isn't a real hostname)
-    // must use exact URL matching to avoid closing unrelated tabs
-    const useExact  = group.domain === '__landing-pages__' || !!group.label;
-
-    if (useExact) {
-      await closeTabsExact(urls);
-    } else {
-      await closeTabsByUrls(urls);
-    }
+    const urls = group.tabs.map(t => t.url);
+    await closeTabsByUrls(urls);
 
     if (card) {
       playCloseSound();
@@ -1414,8 +1453,17 @@ document.addEventListener('click', async (e) => {
 
   // ---- Close ALL open tabs ----
   if (action === 'close-all-open-tabs') {
+    // Exclude Tab Out's own new-tab pages (across Chrome/Edge/Brave) and
+    // other internal schemes so we don't close the page the user is on.
     const allUrls = openTabs
-      .filter(t => t.url && !t.url.startsWith('chrome') && !t.url.startsWith('about:'))
+      .filter(t =>
+        t.url &&
+        !t.isTabOut &&
+        !t.url.startsWith('chrome') &&
+        !t.url.startsWith('edge:') &&
+        !t.url.startsWith('brave:') &&
+        !t.url.startsWith('about:')
+      )
       .map(t => t.url);
     await closeTabsByUrls(allUrls);
     playCloseSound();
@@ -1477,6 +1525,19 @@ document.addEventListener('input', async (e) => {
 
 
 /* ----------------------------------------------------------------
+   FAVICON FALLBACK — hide broken favicon images.
+   Inline onerror attributes are blocked by the MV3 default CSP, so we
+   use a single delegated listener in the capture phase (the 'error'
+   event doesn't bubble).
+   ---------------------------------------------------------------- */
+document.addEventListener('error', (e) => {
+  const el = e.target;
+  if (el && el.tagName === 'IMG') el.style.display = 'none';
+}, true);
+
+
+/* ----------------------------------------------------------------
    INITIALIZE
    ---------------------------------------------------------------- */
+initThemeSwitcher();
 renderDashboard();

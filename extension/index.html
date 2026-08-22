@@ -10,6 +10,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="style.css">
+
+  <!-- Apply saved theme before body paints (avoids flash of default palette) -->
+  <script src="theme-init.js"></script>
 </head>
 <body>
 <div class="container">
@@ -25,6 +28,27 @@
       <h1 id="greeting"></h1>
       <!-- "Friday, April 4, 2026" — written by getDateDisplay() in app.js -->
       <div class="date" id="dateDisplay"></div>
+    </div>
+    <div class="header-right">
+      <!-- Theme switcher — active state + persistence handled in app.js -->
+      <div class="theme-switcher" id="themeSwitcher" role="radiogroup" aria-label="Theme">
+        <button class="theme-btn" data-action="set-theme" data-theme-name="warm"
+                role="radio" aria-pressed="false" title="Warm paper">
+          <span class="theme-swatch theme-swatch-warm"></span>
+        </button>
+        <button class="theme-btn" data-action="set-theme" data-theme-name="midnight"
+                role="radio" aria-pressed="false" title="Midnight">
+          <span class="theme-swatch theme-swatch-midnight"></span>
+        </button>
+        <button class="theme-btn" data-action="set-theme" data-theme-name="arctic"
+                role="radio" aria-pressed="false" title="Arctic frost">
+          <span class="theme-swatch theme-swatch-arctic"></span>
+        </button>
+        <button class="theme-btn" data-action="set-theme" data-theme-name="forest"
+                role="radio" aria-pressed="false" title="Forest canopy">
+          <span class="theme-swatch theme-swatch-forest"></span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -126,8 +150,9 @@
 </div>
 
 <!-- Personal config (gitignored) — defines LOCAL_LANDING_PAGE_PATTERNS etc. -->
-<!-- If the file doesn't exist, that's fine — app.js uses sensible defaults. -->
-<script src="config.local.js" onerror="/* no personal config, that's fine */"></script>
+<!-- If the file doesn't exist it just 404s; app.js falls back to defaults. -->
+<!-- (Inline onerror attributes are blocked by the MV3 default CSP.) -->
+<script src="config.local.js"></script>
 
 <!-- Main dashboard logic — loads last so the DOM is ready -->
 <script src="app.js"></script>
