@@ -30,6 +30,10 @@
       <div class="date" id="dateDisplay"></div>
     </div>
     <div class="header-right">
+      <!-- Global tab search — filtering + keyboard shortcuts handled in app.js -->
+      <input type="search" id="tabSearch" class="tab-search"
+             placeholder="Search tabs  ( / )" autocomplete="off" spellcheck="false"
+             aria-label="Search open tabs">
       <!-- Theme switcher — active state + persistence handled in app.js -->
       <div class="theme-switcher" id="themeSwitcher" role="radiogroup" aria-label="Theme">
         <button class="theme-btn" data-action="set-theme" data-theme-name="warm"

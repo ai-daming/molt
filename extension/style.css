@@ -72,6 +72,34 @@
   --shadow: rgba(45, 74, 43, 0.08);
 }
 
+/* ---- Global tab search (top-right of header, before theme switcher) ---- */
+.tab-search {
+  width: 190px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--warm-gray);
+  background: var(--card-bg);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  transition: width 0.18s ease, border-color 0.18s ease;
+}
+
+.tab-search::placeholder { color: var(--muted); }
+
+.tab-search:focus {
+  outline: none;
+  width: 260px;
+  border-color: var(--accent-amber);
+}
+
+/* Empty state shown when a search matches nothing */
+.search-empty {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 18px 4px;
+}
+
 /* ---- Theme switcher (top-right of header) ---- */
 .header-right {
   display: flex;

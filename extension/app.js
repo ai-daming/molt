@@ -1058,6 +1058,10 @@ function renderArchiveItem(item) {
  * 5. Updates footer stats
  * 6. Renders the "Saved for Later" checklist
  */
+// --- Global tab search state ---
+let searchQuery    = '';
+let searchDebounce = null;
+
 async function renderStaticDashboard() {
   // --- Header ---
   const greetingEl = document.getElementById('greeting');
@@ -1181,6 +1185,19 @@ async function renderStaticDashboard() {
     return b.tabs.length - a.tabs.length;
   });
 
+  // --- Global search filter (data-level, before render) ---
+  let visibleTabsCount = realTabs.length;
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    domainGroups = domainGroups
+      .map(g => ({ ...g, tabs: g.tabs.filter(t =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.url   || '').toLowerCase().includes(q)
+      )}))
+      .filter(g => g.tabs.length > 0);
+    visibleTabsCount = domainGroups.reduce((s, g) => s + g.tabs.length, 0);
+  }
+
   // --- Render domain cards ---
   const openTabsSection      = document.getElementById('openTabsSection');
   const openTabsMissionsEl   = document.getElementById('openTabsMissions');
@@ -1189,11 +1206,24 @@ async function renderStaticDashboard() {
 
   if (domainGroups.length > 0 && openTabsSection) {
     if (openTabsSectionTitle) openTabsSectionTitle.textContent = 'Open tabs';
-    openTabsSectionCount.innerHTML = `${domainGroups.length} domain${domainGroups.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp; <button class="action-btn close-tabs" data-action="close-all-open-tabs" style="font-size:11px;padding:3px 10px;">${ICONS.close} Close all ${realTabs.length} tabs</button>`;
+    if (searchQuery) {
+      // While filtering, don't offer "Close all" — it closes hidden tabs too
+      openTabsSectionCount.innerHTML = `<b>${visibleTabsCount}</b> match${visibleTabsCount !== 1 ? 'es' : ''} for &ldquo;${escapeHtml(searchQuery)}&rdquo; in ${domainGroups.length} site${domainGroups.length !== 1 ? 's' : ''}`;
+    } else {
+      openTabsSectionCount.innerHTML = `${domainGroups.length} domain${domainGroups.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp; <button class="action-btn close-tabs" data-action="close-all-open-tabs" style="font-size:11px;padding:3px 10px;">${ICONS.close} Close all ${realTabs.length} tabs</button>`;
+    }
     openTabsMissionsEl.innerHTML = domainGroups.map(g => renderDomainCard(g)).join('');
     openTabsSection.style.display = 'block';
   } else if (openTabsSection) {
-    openTabsSection.style.display = 'none';
+    if (searchQuery) {
+      // Keep the section visible with an empty state instead of hiding it mid-search
+      if (openTabsSectionTitle) openTabsSectionTitle.textContent = 'Open tabs';
+      openTabsSectionCount.innerHTML = `No matches for &ldquo;${escapeHtml(searchQuery)}&rdquo;`;
+      openTabsMissionsEl.innerHTML = '<div class="search-empty">Nothing found — try a shorter query, or press Esc to clear.</div>';
+      openTabsSection.style.display = 'block';
+    } else {
+      openTabsSection.style.display = 'none';
+    }
   }
 
   // --- Footer stats ---
@@ -1520,6 +1550,40 @@ document.addEventListener('input', async (e) => {
       || '<div style="font-size:12px;color:var(--muted);padding:8px 0">No results</div>';
   } catch (err) {
     console.warn('[tab-out] Archive search failed:', err);
+  }
+});
+
+
+/* ----------------------------------------------------------------
+   GLOBAL TAB SEARCH — debounced filter + keyboard shortcuts.
+   `/` focuses the box, Esc clears, Enter jumps to first result.
+   ---------------------------------------------------------------- */
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'tabSearch') return;
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => {
+    searchQuery = e.target.value.trim();
+    renderStaticDashboard();
+  }, 120);
+});
+
+document.addEventListener('keydown', (e) => {
+  const searchEl = document.getElementById('tabSearch');
+  if (!searchEl) return;
+  const active   = document.activeElement;
+  const typing   = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+
+  if (e.key === '/' && active !== searchEl && !typing) {
+    e.preventDefault();
+    searchEl.focus();
+    searchEl.select();
+  } else if (e.key === 'Escape' && active === searchEl) {
+    if (searchQuery) { searchQuery = ''; renderStaticDashboard(); }
+    searchEl.value = '';
+    searchEl.blur();
+  } else if (e.key === 'Enter' && active === searchEl) {
+    const first = document.querySelector('#openTabsMissions .page-chip[data-action="focus-tab"]');
+    if (first) first.click();
   }
 });
 

@@ -22,7 +22,7 @@ Active fork of [zarazhangrui/tab-out](https://github.com/zarazhangrui/tab-out) (
 - [ ] **真机回归**：加载 unpacked 扩展，覆盖上游 issue #33（Chrome 147 报错）、#12（新标签页加载慢）两个场景，记录基线
 - [ ] **性能**：渲染防抖 + 首屏优化（参考 soarpenguin fork 的 refresh debounce 思路）
 - [ ] **暗色模式**：默认跟随系统，手动可切换（PR #29 已带来切换器，需打磨）
-- [ ] **全局搜索**：`/` 或 Cmd+F 聚焦，按标题/URL 过滤（参考 PR #54）
+- [x] **全局搜索**：`/` 聚焦（标题/URL 实时过滤、120ms 防抖）、Esc 清空、Enter 跳转首个结果；搜索时隐藏"Close all"防误关（2026-08-22）
 - [ ] **双入口开关**：设置项可选"接管新标签页"或"点图标打开面板"（manifest 的 `chrome_url_overrides` 动态化，参考 PR #51 + birkdev 商店版）
 - [ ] **会话自动快照**：`chrome.storage.local` 定期存打开标签列表，崩溃/断电可恢复（对齐 Session Buddy 口碑，品类第一痛点是数据丢失）
 
