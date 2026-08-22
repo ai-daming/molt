@@ -7,10 +7,16 @@
   "chrome_url_overrides": { "newtab": "index.html" },
   "background": { "service_worker": "background.js" },
   "action": {
-    "default_title": "Tab Out",
+    "default_title": "Tab Out — open dashboard",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png"
+    }
+  },
+  "commands": {
+    "open-dashboard": {
+      "suggested_key": { "default": "Alt+T" },
+      "description": "Open the Tab Out dashboard"
     }
   },
   "icons": {

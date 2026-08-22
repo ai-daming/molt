@@ -23,7 +23,7 @@ Active fork of [zarazhangrui/tab-out](https://github.com/zarazhangrui/tab-out) (
 - [ ] **性能**：渲染防抖 + 首屏优化（参考 soarpenguin fork 的 refresh debounce 思路）
 - [ ] **暗色模式**：默认跟随系统，手动可切换（PR #29 已带来切换器，需打磨）
 - [x] **全局搜索**：`/` 聚焦（标题/URL 实时过滤、120ms 防抖）、Esc 清空、Enter 跳转首个结果；搜索时隐藏"Close all"防误关（2026-08-22）
-- [ ] **双入口开关**：设置项可选"接管新标签页"或"点图标打开面板"（manifest 的 `chrome_url_overrides` 动态化，参考 PR #51 + birkdev 商店版）
+- [ ] **双入口开关**：图标点击 + Alt+T 唤起已完成（2026-08-22，聚焦已有仪表盘防重复）；剩余：设置项支持关闭"接管新标签页"
 - [ ] **会话自动快照**：`chrome.storage.local` 定期存打开标签列表，崩溃/断电可恢复（对齐 Session Buddy 口碑，品类第一痛点是数据丢失）
 
 ## Phase 2 — AI 增值（MVP 上架后，第一个只做"AI 清扫建议"）

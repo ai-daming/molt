@@ -60,6 +60,41 @@ async function updateBadge() {
   }
 }
 
+// ─── Toolbar icon / keyboard entry ────────────────────────────────────────────
+
+/**
+ * focusOrOpenDashboard()
+ *
+ * Clicking the toolbar icon (or pressing Alt+T) summons the dashboard.
+ * Focuses an existing dashboard tab if one is already open — an anti-hoarding
+ * tool must not manufacture duplicate tabs of its own.
+ */
+async function focusOrOpenDashboard() {
+  const url = chrome.runtime.getURL('index.html');
+  const existing = await chrome.tabs.query({ url });
+
+  if (existing.length > 0) {
+    // Prefer a dashboard tab in the window the user is looking at
+    const [current] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const target = existing.find(t => t.windowId === current?.windowId) || existing[0];
+    await chrome.tabs.update(target.id, { active: true });
+    if (target.windowId !== chrome.windows.WINDOW_ID_NONE) {
+      await chrome.windows.update(target.windowId, { focused: true });
+    }
+    return;
+  }
+
+  await chrome.tabs.create({ url });
+}
+
+// Toolbar icon click — fires because no default_popup is set on the action
+chrome.action.onClicked.addListener(focusOrOpenDashboard);
+
+// Alt+T — bound via "commands" in manifest.json (rebindable at chrome://extensions/shortcuts)
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'open-dashboard') focusOrOpenDashboard();
+});
+
 // ─── Event listeners ──────────────────────────────────────────────────────────
 
 // Update badge when the extension is first installed
