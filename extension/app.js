@@ -202,6 +202,19 @@ function applyTheme(name, { save = false } = {}) {
 
 function initThemeSwitcher() {
   applyTheme(getActiveTheme(), { save: false });
+
+  // Follow OS light/dark switches live — but only while the user hasn't
+  // picked a theme manually (a stored choice wins permanently).
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onSchemeChange = () => {
+      let stored = null;
+      try { stored = localStorage.getItem(THEME_STORAGE_KEY); } catch {}
+      if (!stored) applyTheme(mq.matches ? 'midnight' : 'warm', { save: false });
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSchemeChange);
+    else if (mq.addListener) mq.addListener(onSchemeChange); // older Chrome
+  }
 }
 
 
