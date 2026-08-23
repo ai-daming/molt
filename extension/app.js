@@ -1277,6 +1277,16 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  // ---- Settings popover ----
+  if (action === 'toggle-settings') {
+    const pop = document.getElementById('settingsPopover');
+    if (pop) {
+      pop.hidden = !pop.hidden;
+      actionEl.setAttribute('aria-expanded', String(!pop.hidden));
+    }
+    return;
+  }
+
   // ---- Close duplicate Tab Out tabs ----
   if (action === 'close-tabout-dupes') {
     await closeTabOutDupes();
@@ -1614,7 +1624,61 @@ document.addEventListener('error', (e) => {
 
 
 /* ----------------------------------------------------------------
+   SETTINGS — "take over the new tab page" toggle.
+
+   Stored in chrome.storage.local under "takeoverNewTab" (absent = true).
+   The manifest's chrome_url_overrides can't change at runtime, so the
+   new tab page itself decides what to render: when takeover is off, it
+   shows a minimal page and never steals focus, letting Chrome keep the
+   omnibox focused — a native new tab feel. The dashboard stays one
+   click away via the toolbar icon or Alt+T (index.html?entry=icon).
+   ---------------------------------------------------------------- */
+document.addEventListener('change', async (e) => {
+  if (e.target.id !== 'takeoverToggle') return;
+  const takeover = e.target.checked;
+  await chrome.storage.local.set({ takeoverNewTab: takeover });
+  showToast(takeover
+    ? 'New tab takeover on — takes effect on your next new tab'
+    : 'New tab takeover off — dashboard now opens via icon or Alt+T');
+});
+
+// Close the settings popover when clicking anywhere outside it
+document.addEventListener('click', (e) => {
+  const pop = document.getElementById('settingsPopover');
+  if (!pop || pop.hidden) return;
+  if (!pop.contains(e.target) && !e.target.closest('.settings-btn')) {
+    pop.hidden = true;
+    const btn = document.querySelector('.settings-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+});
+
+
+/* ----------------------------------------------------------------
    INITIALIZE
    ---------------------------------------------------------------- */
-initThemeSwitcher();
-renderDashboard();
+async function init() {
+  initThemeSwitcher();
+
+  // Reflect the stored takeover setting in the toggle
+  const { takeoverNewTab = true } = await chrome.storage.local.get('takeoverNewTab');
+  const toggle = document.getElementById('takeoverToggle');
+  if (toggle) toggle.checked = takeoverNewTab;
+
+  // New tab load with takeover disabled → minimal page, skip the dashboard.
+  // Explicit entry (toolbar icon / Alt+T) always renders the dashboard.
+  const explicitEntry = new URLSearchParams(location.search).get('entry') === 'icon';
+  if (!takeoverNewTab && !explicitEntry) {
+    document.body.classList.add('minimal-newtab');
+    const container = document.querySelector('.container');
+    if (container) container.remove();
+    const hint = document.createElement('div');
+    hint.className = 'minimal-hint';
+    hint.textContent = 'Tab Out is not taking over new tabs — open the dashboard via the toolbar icon or Alt+T';
+    document.body.appendChild(hint);
+    return;
+  }
+
+  renderDashboard();
+}
+init();

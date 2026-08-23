@@ -53,6 +53,20 @@
           <span class="theme-swatch theme-swatch-forest"></span>
         </button>
       </div>
+      <!-- Settings (new tab takeover toggle) — handlers in app.js -->
+      <button class="settings-btn" data-action="toggle-settings" title="Settings" aria-haspopup="true" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.23 1.408l-.998.982c-.28.276-.415.665-.398 1.058.006.09.006.18 0 .27-.017.394.119.782.398 1.058l.998.982c.392.385.472 1 .23 1.408l-1.296 2.247a1.125 1.125 0 0 1-1.37.49l-1.217-.456a1.125 1.125 0 0 0-1.075.124 5.53 5.53 0 0 1-.22.128 1.125 1.125 0 0 0-.645.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281a1.125 1.125 0 0 0-.645-.869 5.53 5.53 0 0 1-.22-.128 1.125 1.125 0 0 0-1.075-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .23-1.408l.998-.982c.28-.276.415-.665.398-1.058a4.53 4.53 0 0 1 0-.27c.017-.394-.119-.782-.398-1.058l-.998-.982a1.125 1.125 0 0 1-.23-1.408l1.296-2.247a1.125 1.125 0 0 1 1.37-.49l1.217.456c.355.133.751.072 1.075-.124.073-.044.146-.087.22-.127.332-.184.582-.496.645-.87l.213-1.281Z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </svg>
+      </button>
+      <div class="settings-popover" id="settingsPopover" hidden>
+        <label class="settings-row">
+          <span>Take over the new tab page</span>
+          <input type="checkbox" id="takeoverToggle" checked>
+        </label>
+        <div class="settings-hint">Off: Cmd+T stays native; open the dashboard via the toolbar icon or Alt+T.</div>
+      </div>
     </div>
   </header>
 

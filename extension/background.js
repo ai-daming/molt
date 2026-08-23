@@ -70,8 +70,11 @@ async function updateBadge() {
  * tool must not manufacture duplicate tabs of its own.
  */
 async function focusOrOpenDashboard() {
-  const url = chrome.runtime.getURL('index.html');
-  const existing = await chrome.tabs.query({ url });
+  // ?entry=icon marks an explicit open (vs. a new-tab override load), so the
+  // dashboard renders even when the user has disabled new tab takeover.
+  const url = chrome.runtime.getURL('index.html?entry=icon');
+  // Trailing '*' also matches plain /index.html (new-tab override instances)
+  const existing = await chrome.tabs.query({ url: url.replace('index.html?entry=icon', 'index.html*') });
 
   if (existing.length > 0) {
     // Prefer a dashboard tab in the window the user is looking at
