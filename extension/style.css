@@ -101,6 +101,8 @@
 }
 
 /* ---- Settings (gear button + popover, top-right of header) ---- */
+.header-right { position: relative; } /* anchor for the settings popover */
+
 .settings-btn {
   display: inline-flex;
   align-items: center;
@@ -121,8 +123,8 @@
 
 .settings-popover {
   position: absolute;
-  top: 64px;
-  right: 24px;
+  top: calc(100% + 10px);
+  right: 0;
   z-index: 50;
   width: 260px;
   padding: 14px 16px;
