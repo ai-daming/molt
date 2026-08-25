@@ -263,6 +263,11 @@ header {
   margin-bottom: 48px;
   padding-bottom: 24px;
   border-bottom: 1px solid var(--warm-gray);
+  /* fadeUp's retained transform creates a stacking context that traps the
+     settings popover below later DOM siblings; lift the whole header above
+     the sections so the popover can never be covered. */
+  position: relative;
+  z-index: 20;
 }
 
 .header-left h1 {
