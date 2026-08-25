@@ -173,6 +173,32 @@ body.minimal-newtab { background: var(--paper); }
   pointer-events: none;
 }
 
+/* ---- Audio indicator on chips (find the tab making noise) ---- */
+.chip-audio {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent-amber);
+  cursor: pointer;
+  animation: audioPulse 1.2s ease-in-out infinite;
+}
+
+.chip-audio svg { width: 13px; height: 13px; }
+
+.chip-audio.is-muted { color: var(--muted); animation: none; }
+
+@keyframes audioPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip-audio { animation: none; }
+}
+
 /* ---- Theme switcher (top-right of header) ---- */
 .header-right {
   display: flex;

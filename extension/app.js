@@ -747,6 +747,8 @@ const ICONS = {
   close:   `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>`,
   archive: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>`,
   focus:   `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 19.5 15-15m0 0H8.25m11.25 0v11.25" /></svg>`,
+  audioOn:  `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>`,
+  audioOff: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>`,
 };
 
 
@@ -815,9 +817,13 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` : '';
+    const mutedNow   = !!(tab.mutedInfo && tab.mutedInfo.muted);
+    const audioTag   = (tab.audible || mutedNow)
+      ? `<button class="chip-audio${mutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${mutedNow ? 'Muted — click to unmute' : 'Playing audio — click to mute'}">${mutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
+      : '';
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
-      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}
+      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
@@ -878,6 +884,13 @@ function renderDomainCard(group) {
     if (!seen.has(tab.url)) { seen.add(tab.url); uniqueTabs.push(tab); }
   }
 
+  // Audio state aggregated across all instances of each URL
+  // (chips are deduped by URL, but any instance may be the one making noise)
+  const mutedByUrl   = {};
+  for (const t of tabs) {
+    if (t.mutedInfo && t.mutedInfo.muted) mutedByUrl[t.url] = true;
+  }
+
   const visibleTabs = uniqueTabs.slice(0, 8);
   const extraCount  = uniqueTabs.length - visibleTabs.length;
 
@@ -893,12 +906,18 @@ function renderDomainCard(group) {
     const chipClass = count > 1 ? ' chip-has-dupes' : '';
     const safeUrl   = escapeHtml(tab.url || '');
     const safeTitle = escapeHtml(label);
+    // Speaker marker: amber pulse while audible, gray slash when muted.
+    // It's a button — click to mute/unmute without leaving the dashboard.
+    const isMutedNow = !!mutedByUrl[tab.url];
+    const audioTag   = (tab.audible || isMutedNow)
+      ? `<button class="chip-audio${isMutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${isMutedNow ? 'Muted — click to unmute' : 'Playing audio — click to mute'}">${isMutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
+      : '';
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` : '';
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
-      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}
+      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
@@ -1223,7 +1242,11 @@ async function renderStaticDashboard() {
       // While filtering, don't offer "Close all" — it closes hidden tabs too
       openTabsSectionCount.innerHTML = `<b>${visibleTabsCount}</b> match${visibleTabsCount !== 1 ? 'es' : ''} for &ldquo;${escapeHtml(searchQuery)}&rdquo; in ${domainGroups.length} site${domainGroups.length !== 1 ? 's' : ''}`;
     } else {
-      openTabsSectionCount.innerHTML = `${domainGroups.length} domain${domainGroups.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp; <button class="action-btn close-tabs" data-action="close-all-open-tabs" style="font-size:11px;padding:3px 10px;">${ICONS.close} Close all ${realTabs.length} tabs</button>`;
+      const playingCount = realTabs.filter(t => t.audible).length;
+      const playingBtn = playingCount > 0
+        ? ` &nbsp;&middot;&nbsp; <button class="action-btn" data-action="mute-all-playing" style="font-size:11px;padding:3px 10px;color:var(--accent-amber);">${ICONS.audioOn} Mute ${playingCount} playing</button>`
+        : '';
+      openTabsSectionCount.innerHTML = `${domainGroups.length} domain${domainGroups.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp; <button class="action-btn close-tabs" data-action="close-all-open-tabs" style="font-size:11px;padding:3px 10px;">${ICONS.close} Close all ${realTabs.length} tabs</button>${playingBtn}`;
     }
     openTabsMissionsEl.innerHTML = domainGroups.map(g => renderDomainCard(g)).join('');
     openTabsSection.style.display = 'block';
@@ -1284,6 +1307,34 @@ document.addEventListener('click', async (e) => {
       pop.hidden = !pop.hidden;
       actionEl.setAttribute('aria-expanded', String(!pop.hidden));
     }
+    return;
+  }
+
+  // ---- Mute / unmute the tabs behind one chip (all instances of the URL) ----
+  if (action === 'toggle-mute-tab') {
+    const url = actionEl.dataset.tabUrl;
+    if (url) {
+      const live    = await chrome.tabs.query({});
+      const targets = live.filter(t => t.url === url);
+      if (targets.length > 0) {
+        const anyUnmuted = targets.some(t => !(t.mutedInfo && t.mutedInfo.muted));
+        for (const t of targets) await chrome.tabs.update(t.id, { muted: anyUnmuted });
+        showToast(anyUnmuted
+          ? `Muted ${targets.length} tab${targets.length !== 1 ? 's' : ''}`
+          : `Unmuted ${targets.length} tab${targets.length !== 1 ? 's' : ''}`);
+        renderDashboard();
+      }
+    }
+    return;
+  }
+
+  // ---- Silence everything that's playing ----
+  if (action === 'mute-all-playing') {
+    const playing = await chrome.tabs.query({ audible: true });
+    if (playing.length === 0) return;
+    for (const t of playing) await chrome.tabs.update(t.id, { muted: true });
+    showToast(`Muted ${playing.length} playing tab${playing.length !== 1 ? 's' : ''}`);
+    renderDashboard();
     return;
   }
 
@@ -1651,6 +1702,16 @@ document.addEventListener('click', (e) => {
     const btn = document.querySelector('.settings-btn');
     if (btn) btn.setAttribute('aria-expanded', 'false');
   }
+});
+
+
+// Keep speaker indicators live: audio starts/stops on background tabs
+// without the user touching anything, so re-render (debounced) on change.
+let audioRefreshTimer = null;
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  if (!('audible' in info) && !('mutedInfo' in info)) return;
+  clearTimeout(audioRefreshTimer);
+  audioRefreshTimer = setTimeout(() => renderDashboard(), 300);
 });
 
 
