@@ -26,6 +26,25 @@
 // All open tabs — populated by fetchOpenTabs()
 let openTabs = [];
 
+// URLs the user locked against bulk-closing (issue #8). In-memory mirror of
+// the "lockedTabs" string array in chrome.storage.local, keyed by exact URL.
+let lockedUrls = new Set();
+
+/**
+ * loadLockedTabs()
+ *
+ * Refreshes the in-memory lock set from chrome.storage.local. Cheap enough
+ * to call before every mutation, so two dashboards open at once still agree.
+ */
+async function loadLockedTabs() {
+  try {
+    const { lockedTabs = [] } = await chrome.storage.local.get('lockedTabs');
+    lockedUrls = new Set(lockedTabs);
+  } catch {
+    // Storage unavailable — keep whatever we had; locks just won't refresh
+  }
+}
+
 // Browser-builtin new-tab URLs across Chromium variants (Chrome, Edge,
 // Brave). The extension page URL itself is also treated as Tab Out.
 const BROWSER_NEWTAB_URLS = [
@@ -42,6 +61,9 @@ const BROWSER_NEWTAB_URLS = [
  * Sets the extensionId flag so we can identify Tab Out's own pages.
  */
 async function fetchOpenTabs() {
+  // Refresh the lock set on every tab sweep — renders downstream of this
+  // call (domain cards, overflow chips) read `lockedUrls` for chip state.
+  await loadLockedTabs();
   try {
     const extensionId = chrome.runtime.id;
     // The new URL for this page is now index.html (not newtab.html)
@@ -75,14 +97,22 @@ async function fetchOpenTabs() {
  * corresponding homepage tab that had been split into the Homepages
  * group. Exact-URL matching keeps the action scoped to what the card
  * actually shows and still closes every duplicate tab for each URL.
+ *
+ * Locked URLs (issue #8) are always skipped, and the caller gets back
+ * how many tabs were closed vs. locked so toasts can say so.
  */
 async function closeTabsByUrls(urls) {
-  if (!urls || urls.length === 0) return;
+  if (!urls || urls.length === 0) return { closed: 0, skipped: 0 };
+  await loadLockedTabs();
   const urlSet = new Set(urls);
   const allTabs = await chrome.tabs.query({});
-  const toClose = allTabs.filter(t => urlSet.has(t.url)).map(t => t.id);
-  if (toClose.length > 0) await chrome.tabs.remove(toClose);
+  const matching = allTabs.filter(t => urlSet.has(t.url));
+  const closable = matching.filter(t => !lockedUrls.has(t.url));
+  if (closable.length > 0) {
+    await chrome.tabs.remove(closable.map(t => t.id));
+  }
   await fetchOpenTabs();
+  return { closed: closable.length, skipped: matching.length - closable.length };
 }
 
 /**
@@ -124,25 +154,38 @@ async function focusTab(url) {
  * Closes duplicate tabs for the given list of URLs.
  * keepOne=true → keep one copy of each, close the rest.
  * keepOne=false → close all copies.
+ *
+ * Locked URLs are never closed (issue #8). When keeping one copy we
+ * prefer an unlocked tab as the survivor so a locked page can end up
+ * duplicated rather than a copy being destroyed.
  */
 async function closeDuplicateTabs(urls, keepOne = true) {
+  await loadLockedTabs();
   const allTabs = await chrome.tabs.query({});
   const toClose = [];
+  let skipped = 0;
 
   for (const url of urls) {
-    const matching = allTabs.filter(t => t.url === url);
+    const matching  = allTabs.filter(t => t.url === url);
+    const unlockedC = matching.filter(t => !lockedUrls.has(t.url));
     if (keepOne) {
-      const keep = matching.find(t => t.active) || matching[0];
+      const keep = unlockedC.find(t => t.active) || unlockedC[0] || matching[0];
       for (const tab of matching) {
-        if (tab.id !== keep.id) toClose.push(tab.id);
+        if (tab.id === keep.id) continue;
+        if (lockedUrls.has(tab.url)) { skipped++; continue; }
+        toClose.push(tab.id);
       }
     } else {
-      for (const tab of matching) toClose.push(tab.id);
+      for (const tab of matching) {
+        if (lockedUrls.has(tab.url)) { skipped++; continue; }
+        toClose.push(tab.id);
+      }
     }
   }
 
   if (toClose.length > 0) await chrome.tabs.remove(toClose);
   await fetchOpenTabs();
+  return { closed: toClose.length, skipped };
 }
 
 /**
@@ -751,6 +794,8 @@ const ICONS = {
   focus:   `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 19.5 15-15m0 0H8.25m11.25 0v11.25" /></svg>`,
   audioOn:  `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>`,
   audioOff: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>`,
+  lock:     `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`,
+  lockOpen: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`,
 };
 
 
@@ -823,10 +868,14 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
     const audioTag   = (tab.audible || mutedNow)
       ? `<button class="chip-audio${mutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${mutedNow ? 'Muted — click to unmute' : 'Playing audio — click to mute'}">${mutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
       : '';
-    return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
+    const lockedNow  = lockedUrls.has(tab.url);
+    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
       <div class="chip-actions">
+        <button class="chip-action chip-lock${lockedNow ? ' is-locked' : ''}" data-action="toggle-lock-tab" data-tab-url="${safeUrl}" title="${lockedNow ? 'Locked — click to unlock' : 'Lock this tab'}">
+          ${lockedNow ? ICONS.lock : ICONS.lockOpen}
+        </button>
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>
@@ -914,13 +963,17 @@ function renderDomainCard(group) {
     const audioTag   = (tab.audible || isMutedNow)
       ? `<button class="chip-audio${isMutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${isMutedNow ? 'Muted — click to unmute' : 'Playing audio — click to mute'}">${isMutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
       : '';
+    const lockedNow  = lockedUrls.has(tab.url);
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = tab.url ? localFaviconUrl(tab.url) : '';
-    return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
+    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
       <div class="chip-actions">
+        <button class="chip-action chip-lock${lockedNow ? ' is-locked' : ''}" data-action="toggle-lock-tab" data-tab-url="${safeUrl}" title="${lockedNow ? 'Locked — click to unlock' : 'Lock this tab'}">
+          ${lockedNow ? ICONS.lock : ICONS.lockOpen}
+        </button>
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>
@@ -1351,6 +1404,25 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  // ---- Lock / unlock a URL against bulk closing (issue #8) ----
+  if (action === 'toggle-lock-tab') {
+    e.stopPropagation();
+    const url = actionEl.dataset.tabUrl;
+    if (!url) return;
+    await loadLockedTabs();
+    if (lockedUrls.has(url)) {
+      lockedUrls.delete(url);
+      await chrome.storage.local.set({ lockedTabs: [...lockedUrls] });
+      showToast('Tab unlocked');
+    } else {
+      lockedUrls.add(url);
+      await chrome.storage.local.set({ lockedTabs: [...lockedUrls] });
+      showToast('Tab locked — bulk close will skip it');
+    }
+    renderDashboard();
+    return;
+  }
+
   // ---- Session snapshots panel ----
   if (action === 'toggle-snapshots') {
     const ov = document.getElementById('snapshotOverlay');
@@ -1441,6 +1513,15 @@ document.addEventListener('click', async (e) => {
     e.stopPropagation(); // don't trigger parent chip's focus-tab
     const tabUrl = actionEl.dataset.tabUrl;
     if (!tabUrl) return;
+
+    // A locked URL is exactly what the lock is protecting — closing it
+    // "by hand" is the same accident with one extra step. Point at the
+    // unlock instead of silently obeying.
+    await loadLockedTabs();
+    if (lockedUrls.has(tabUrl)) {
+      showToast('This tab is locked — click the open lock to unlock first');
+      return;
+    }
 
     // The chip represents a URL (possibly with an "(Nx)" duplicate badge),
     // so close every tab with that exact URL, not just the first one found.
@@ -1565,19 +1646,25 @@ document.addEventListener('click', async (e) => {
     if (!group) return;
 
     const urls = group.tabs.map(t => t.url);
-    await closeTabsByUrls(urls);
-
-    if (card) {
-      playCloseSound();
-      animateCardOut(card);
-    }
+    const { closed, skipped } = await closeTabsByUrls(urls);
 
     // Remove from in-memory groups
     const idx = domainGroups.indexOf(group);
     if (idx !== -1) domainGroups.splice(idx, 1);
 
+    // Locked tabs stayed open — redraw so the card reflects what remains.
+    // Only celebrate with sound + confetti when the card actually emptied.
+    if (skipped > 0) {
+      await renderDashboard();
+    } else if (card) {
+      playCloseSound();
+      animateCardOut(card);
+    }
+
     const groupLabel = group.domain === '__landing-pages__' ? 'Homepages' : (group.label || friendlyDomain(group.domain));
-    showToast(`Closed ${urls.length} tab${urls.length !== 1 ? 's' : ''} from ${groupLabel}`);
+    showToast(skipped > 0
+      ? `Closed ${closed} from ${groupLabel} — kept ${skipped} locked`
+      : `Closed ${urls.length} tab${urls.length !== 1 ? 's' : ''} from ${groupLabel}`);
 
     const statTabs = document.getElementById('statTabs');
     if (statTabs) statTabs.textContent = openTabs.length;
@@ -1590,13 +1677,21 @@ document.addEventListener('click', async (e) => {
     const urls = urlsEncoded.split(',').map(u => decodeURIComponent(u)).filter(Boolean);
     if (urls.length === 0) return;
 
-    await closeDuplicateTabs(urls, true);
-    playCloseSound();
+    const { closed, skipped } = await closeDuplicateTabs(urls, true);
 
     // Hide the dedup button
     actionEl.style.transition = 'opacity 0.2s';
     actionEl.style.opacity    = '0';
     setTimeout(() => actionEl.remove(), 200);
+
+    if (skipped > 0) {
+      // Locked copies survived — redraw so badges match what's still open.
+      await renderDashboard();
+      showToast(`Closed ${closed} duplicate${closed !== 1 ? 's' : ''} — kept ${skipped} locked`);
+      return;
+    }
+
+    playCloseSound();
 
     // Remove dupe badges from the card
     if (card) {
@@ -1634,18 +1729,26 @@ document.addEventListener('click', async (e) => {
         !t.url.startsWith('about:')
       )
       .map(t => t.url);
-    await closeTabsByUrls(allUrls);
-    playCloseSound();
+    const { closed, skipped } = await closeTabsByUrls(allUrls);
 
-    document.querySelectorAll('#openTabsMissions .mission-card').forEach(c => {
-      shootConfetti(
-        c.getBoundingClientRect().left + c.offsetWidth / 2,
-        c.getBoundingClientRect().top  + c.offsetHeight / 2
-      );
-      animateCardOut(c);
-    });
+    if (skipped > 0) {
+      // Some cards survive — redraw instead of animating everything away.
+      await renderDashboard();
+    } else {
+      playCloseSound();
 
-    showToast('All tabs closed. Fresh start.');
+      document.querySelectorAll('#openTabsMissions .mission-card').forEach(c => {
+        shootConfetti(
+          c.getBoundingClientRect().left + c.offsetWidth / 2,
+          c.getBoundingClientRect().top  + c.offsetHeight / 2
+        );
+        animateCardOut(c);
+      });
+    }
+
+    showToast(skipped > 0
+      ? `Closed ${closed} tab${closed !== 1 ? 's' : ''} — kept ${skipped} locked`
+      : 'All tabs closed. Fresh start.');
     return;
   }
 });

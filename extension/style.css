@@ -906,6 +906,22 @@ header {
   background: rgba(90, 122, 98, 0.08);
 }
 
+/* Lock toggle (issue #8) — locked state stays visible without hover so
+   you can always see which tabs bulk-close will skip. */
+.chip-lock:hover {
+  color: var(--accent-amber);
+  background: rgba(200, 113, 58, 0.08);
+}
+
+.chip-lock.is-locked {
+  opacity: 1;
+  color: var(--accent-amber);
+}
+
+.chip-lock.is-locked:hover {
+  background: rgba(200, 113, 58, 0.12);
+}
+
 .chip-close:hover {
   color: var(--status-abandoned);
   background: rgba(179, 90, 90, 0.08);
