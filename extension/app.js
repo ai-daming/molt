@@ -816,7 +816,7 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
     const safeTitle = escapeHtml(label);
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
-    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` : '';
+    const faviconUrl = tab.url ? localFaviconUrl(tab.url) : '';
     const mutedNow   = !!(tab.mutedInfo && tab.mutedInfo.muted);
     const audioTag   = (tab.audible || mutedNow)
       ? `<button class="chip-audio${mutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${mutedNow ? 'Muted — click to unmute' : 'Playing audio — click to mute'}">${mutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
@@ -914,7 +914,7 @@ function renderDomainCard(group) {
       : '';
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
-    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` : '';
+    const faviconUrl = tab.url ? localFaviconUrl(tab.url) : '';
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
@@ -1032,7 +1032,7 @@ async function renderDeferredColumn() {
 function renderDeferredItem(item) {
   let domain = '';
   try { domain = new URL(item.url).hostname.replace(/^www\./, ''); } catch {}
-  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` : '';
+  const faviconUrl = item.url ? localFaviconUrl(item.url) : '';
   const ago = timeAgo(item.savedAt);
   const safeId    = escapeHtml(item.id);
   const safeUrl   = escapeHtml(isSafeNavUrl(item.url) ? item.url : '#');
@@ -1090,6 +1090,17 @@ function renderArchiveItem(item) {
  * 5. Updates footer stats
  * 6. Renders the "Saved for Later" checklist
  */
+/**
+ * localFaviconUrl(pageUrl)
+ *
+ * Chrome's built-in local favicon database — zero network requests, works
+ * offline and for both live tabs and saved items. Replaced the old
+ * google.com/s2/favicons lookups so "no external API calls" is literally true.
+ */
+function localFaviconUrl(pageUrl) {
+  return `chrome://favicon2?size=16&scale_factor=1x&page_url=${encodeURIComponent(pageUrl)}`;
+}
+
 // --- Global tab search state ---
 let searchQuery    = '';
 let searchDebounce = null;
