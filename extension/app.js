@@ -1095,7 +1095,7 @@ function renderArchiveItem(item) {
  *
  * Chrome's built-in local favicon database — zero network requests, works
  * offline and for both live tabs and saved items. Replaced the old
- * google.com/s2/favicons lookups so "no external API calls" is literally true.
+ * third-party favicon-service lookups so "no external API calls" is literally true.
  */
 function localFaviconUrl(pageUrl) {
   return `chrome://favicon2?size=16&scale_factor=1x&page_url=${encodeURIComponent(pageUrl)}`;
