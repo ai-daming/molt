@@ -1,6 +1,6 @@
 # Roadmap
 
-Active fork of [zarazhangrui/tab-out](https://github.com/zarazhangrui/tab-out) (MIT).
+产品名：**Molt**（2026-08-26 定名，GitHub/CWS/AMO 三处查重通过）。上游：[zarazhangrui/tab-out](https://github.com/zarazhangrui/tab-out) (MIT)。
 定位：**本地优先、无账号、无追踪的新标签页标签仪表盘**，长期维护，目标上架 Chrome Web Store。
 
 ## 定位红线（永远不做）
@@ -53,7 +53,7 @@ Active fork of [zarazhangrui/tab-out](https://github.com/zarazhangrui/tab-out) (
 
 ## Phase 3 — 上架准备
 
-- [ ] 产品命名 + 三处查重（Chrome 商店 / GitHub / Firefox AMO）
+- [x] 产品命名 + 三处查重（Chrome 商店 / GitHub / Firefox AMO）—— 定名 **Molt**（2026-08-26）
 - [ ] 品牌替换：manifest name、图标、README 中英双语
 - [ ] 商店素材：5 张截图（1280×800）、描述首行写"100% 本地，无账号，无追踪"
 - [ ] 隐私表单：勾选"不收集任何数据"（属实）

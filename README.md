@@ -1,10 +1,12 @@
-# Tab Out
+# Molt
 
-**Keep tabs on your tabs.**
+**Shed your old tabs.**
 
-Tab Out is a Chrome extension that replaces your new tab page with a dashboard of everything you have open. Tabs are grouped by domain, with homepages (Gmail, X, LinkedIn, etc.) pulled into their own group. Close tabs with a satisfying swoosh + confetti.
+Molt is a Chrome extension that replaces your new tab page with a dashboard of everything you have open. Tabs are grouped by domain, so you can see the whole herd at a glance — and close what you're done with, satisfying swoosh + confetti included.
 
-No server. No account. No external API calls. Just a Chrome extension.
+Closing is **reversible**: session snapshots are taken automatically as your tabs change, so you can sweep boldly and restore anything you miss.
+
+No server. No account. No external API calls. Nothing leaves your machine.
 
 ---
 
@@ -13,25 +15,10 @@ No server. No account. No external API calls. Just a Chrome extension.
 Send your coding agent (Claude Code, Codex, etc.) this repo and say **"install this"**:
 
 ```
-https://github.com/zarazhangrui/tab-out
+https://github.com/ai-daming/molt
 ```
 
 The agent will walk you through it. Takes about 1 minute.
-
----
-
-## Features
-
-- **See all your tabs at a glance** on a clean grid, grouped by domain
-- **Homepages group** pulls Gmail inbox, X home, YouTube, LinkedIn, GitHub homepages into one card
-- **Close tabs with style** with swoosh sound + confetti burst
-- **Duplicate detection** flags when you have the same page open twice, with one-click cleanup
-- **Click any tab to jump to it** across windows, no new tab opened
-- **Save for later** bookmark tabs to a checklist before closing them
-- **Localhost grouping** shows port numbers next to each tab so you can tell your vibe coding projects apart
-- **Expandable groups** show the first 8 tabs with a clickable "+N more"
-- **100% local** your data never leaves your machine
-- **Pure Chrome extension** no server, no Node.js, no npm, no setup beyond loading the extension
 
 ---
 
@@ -40,7 +27,7 @@ The agent will walk you through it. Takes about 1 minute.
 **1. Clone the repo**
 
 ```bash
-git clone https://github.com/zarazhangrui/tab-out.git
+git clone https://github.com/ai-daming/molt.git
 ```
 
 **2. Load the Chrome extension**
@@ -52,22 +39,36 @@ git clone https://github.com/zarazhangrui/tab-out.git
 
 **3. Open a new tab**
 
-You'll see Tab Out.
+You'll see Molt.
+
+---
+
+## Features
+
+- **See all your tabs at a glance** — clean grid grouped by domain, homepages (Gmail, X, YouTube, GitHub…) pulled into their own card
+- **Global search** — press `/` anywhere on the page, filter by title or URL, `Enter` jumps to the first match
+- **Find the noisy tab** — amber speaker markers appear on chips while a tab plays audio; click one to mute, or silence everything at once
+- **Session snapshots** — auto-saved as your tabs change; restore all or pick individual tabs, with window grouping and pinned state preserved
+- **Two ways in** — takes over your new tab page by default (optional: turn it off in settings), or summon it from any page via the toolbar icon / `Alt+T`
+- **Duplicate detection** — the same page open twice gets flagged, one-click cleanup
+- **Save for later** — bookmark tabs to a checklist before closing them
+- **Localhost grouping** — port numbers shown next to each tab, so your dev projects stay apart
+- **Themes** — warm / midnight / arctic / forest; follows your OS color scheme until you pick one
+- **100% local** — your data never leaves your machine
 
 ---
 
 ## How it works
 
 ```
-You open a new tab
-  -> Tab Out shows your open tabs grouped by domain
-  -> Homepages (Gmail, X, etc.) get their own group at the top
-  -> Click any tab title to jump to it
+You open a new tab (or click the toolbar icon / press Alt+T)
+  -> Molt shows your open tabs grouped by domain
+  -> Press / to search, spot the noisy tab, sweep duplicates
   -> Close groups you're done with (swoosh + confetti)
-  -> Save tabs for later before closing them
+  -> Changed your mind? Restore from a session snapshot
 ```
 
-Everything runs inside the Chrome extension. No external server, no API calls, no data sent anywhere. Saved tabs are stored in `chrome.storage.local`.
+Everything runs inside the Chrome extension. No external server, no API calls, no data sent anywhere. Saved tabs and snapshots live in `chrome.storage.local`.
 
 ---
 
@@ -82,10 +83,8 @@ Everything runs inside the Chrome extension. No external server, no API calls, n
 
 ---
 
-## License
+## Attribution & license
+
+Molt is an actively maintained fork of [Tab Out](https://github.com/zarazhangrui/tab-out) by [Zara Zhang](https://x.com/zarazhangrui), MIT licensed — see `LICENSE` and `NOTICE`. It incorporates security fixes from Tab Out's unmerged [PR #29](https://github.com/zarazhangrui/tab-out/pull/29) by [@SivanCola](https://github.com/SivanCola), plus fixes and ideas from the Tab Out fork community.
 
 MIT
-
----
-
-Built by [Zara](https://x.com/zarazhangrui)

@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Tab Out",
+  "name": "Molt",
   "version": "1.0.0",
-  "description": "Keep tabs on your tabs. New tab page that groups your open tabs by domain and lets you close them with style.",
+  "description": "Shed your old tabs. A new-tab dashboard of everything you have open — grouped by domain, searchable, with audio finding, session snapshots, and satisfying closes. 100% local.",
   "permissions": ["tabs", "activeTab", "storage"],
   "chrome_url_overrides": { "newtab": "index.html" },
   "background": { "service_worker": "background.js" },
   "action": {
-    "default_title": "Tab Out — open dashboard",
+    "default_title": "Molt — open dashboard",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png"
@@ -16,7 +16,7 @@
   "commands": {
     "open-dashboard": {
       "suggested_key": { "default": "Alt+T" },
-      "description": "Open the Tab Out dashboard"
+      "description": "Open the Molt dashboard"
     }
   },
   "icons": {

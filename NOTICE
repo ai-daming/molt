@@ -1,0 +1,14 @@
+NOTICE
+
+Molt
+Copyright (c) 2026 ai-daming
+
+This product is a derivative work of "Tab Out"
+(https://github.com/zarazhangrui/tab-out), Copyright (c) 2026 Zara Zhang,
+licensed under the MIT License (see LICENSE).
+
+It incorporates security fixes from Tab Out pull request #29
+(https://github.com/zarazhangrui/tab-out/pull/29) by SivanCola,
+and benefits from the wider Tab Out fork community.
+
+Licensed under the MIT License.

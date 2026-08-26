@@ -1,5 +1,5 @@
 /* ================================================================
-   Tab Out — Dashboard App (Pure Extension Edition)
+   Molt — Dashboard App (Pure Extension Edition)
 
    This file is the brain of the dashboard. Now that the dashboard
    IS the extension page (not inside an iframe), it can call
@@ -1400,7 +1400,7 @@ document.addEventListener('click', async (e) => {
       banner.style.opacity = '0';
       setTimeout(() => { banner.style.display = 'none'; banner.style.opacity = '1'; }, 400);
     }
-    showToast('Closed extra Tab Out tabs');
+    showToast('Closed extra Molt tabs');
     return;
   }
 
@@ -2048,7 +2048,7 @@ async function init() {
     if (container) container.remove();
     const hint = document.createElement('div');
     hint.className = 'minimal-hint';
-    hint.textContent = 'Tab Out is not taking over new tabs — open the dashboard via the toolbar icon or Alt+T';
+    hint.textContent = 'Molt is not taking over new tabs — open the dashboard via the toolbar icon or Alt+T';
     document.body.appendChild(hint);
     return;
   }
