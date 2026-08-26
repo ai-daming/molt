@@ -869,7 +869,7 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
       ? `<button class="chip-audio${mutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${mutedNow ? 'Muted — click to unmute' : 'Playing audio — click to mute'}">${mutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
       : '';
     const lockedNow  = lockedUrls.has(tab.url);
-    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
+    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" tabindex="0" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
       <div class="chip-actions">
@@ -967,7 +967,7 @@ function renderDomainCard(group) {
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = tab.url ? localFaviconUrl(tab.url) : '';
-    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
+    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" tabindex="0" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
       <div class="chip-actions">
@@ -1812,6 +1812,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('keydown', (e) => {
   // Escape closes the snapshot panel first, then the search box
   if (e.key === 'Escape') {
+    hideChipPreview();
     const ov = document.getElementById('snapshotOverlay');
     if (ov && ov.classList.contains('open')) { closeSnapshots(); return; }
   }
@@ -1819,6 +1820,14 @@ document.addEventListener('keydown', (e) => {
   if (!searchEl) return;
   const active   = document.activeElement;
   const typing   = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+
+  // Chips are plain divs with tabindex=0 — make Enter activate the focused
+  // chip so keyboard users get the same "jump to tab" action as clicking.
+  if (e.key === 'Enter' && active && active.classList?.contains('page-chip')) {
+    e.preventDefault();
+    active.click();
+    return;
+  }
 
   if (e.key === '/' && active !== searchEl && !typing) {
     e.preventDefault();
@@ -1845,6 +1854,117 @@ document.addEventListener('error', (e) => {
   const el = e.target;
   if (el && el.tagName === 'IMG') el.style.display = 'none';
 }, true);
+
+
+/* ----------------------------------------------------------------
+   CHIP HOVER PREVIEW (issue #6)
+
+   One shared tooltip-like card shows a chip's full title + URL +
+   domain after ~300ms of hover (instantly on keyboard focus). The
+   card lives outside the re-rendered grid, fills its nodes with
+   textContent only (zero innerHTML surface), and is pointer-events:
+   none so it can sit above chips without ever stealing a click.
+   ---------------------------------------------------------------- */
+
+const PREVIEW_DELAY_MS = 300;
+let previewTimer   = null;
+let previewChipEl  = null;
+
+function ensureChipPreviewEl() {
+  let el = document.getElementById('chipPreview');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'chipPreview';
+    el.className = 'chip-preview';
+    el.setAttribute('role', 'tooltip');
+    el.innerHTML = `
+      <div class="chip-preview-head">
+        <img class="chip-preview-favicon" alt="">
+        <span class="chip-preview-domain"></span>
+      </div>
+      <div class="chip-preview-title"></div>
+      <div class="chip-preview-url"></div>`;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function hideChipPreview() {
+  clearTimeout(previewTimer);
+  previewTimer = null;
+  previewChipEl = null;
+  const el = document.getElementById('chipPreview');
+  if (el) el.classList.remove('visible');
+}
+
+function showChipPreview(chip, { instant = false } = {}) {
+  clearTimeout(previewTimer);
+
+  const paint = () => {
+    previewTimer = null;
+    // A dashboard re-render may have replaced this chip mid-wait
+    if (!chip.isConnected) return;
+
+    const el      = ensureChipPreviewEl();
+    const url     = chip.dataset.tabUrl || '';
+    // The chip's title attribute carries the clean full label already
+    const title   = chip.getAttribute('title') || url;
+    let hostname  = '';
+    try { hostname = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+
+    el.querySelector('.chip-preview-title').textContent  = title;
+    el.querySelector('.chip-preview-url').textContent    = url;
+    el.querySelector('.chip-preview-domain').textContent = hostname;
+    const fav = el.querySelector('.chip-preview-favicon');
+    fav.style.display = '';
+    fav.src = url ? localFaviconUrl(url) : '';
+
+    // Measure off-screen, position clamped to the viewport, then fade in
+    el.classList.remove('visible');
+    const rect = chip.getBoundingClientRect();
+    const w = el.offsetWidth, h = el.offsetHeight;
+    let x = Math.min(rect.left, window.innerWidth  - w - 8);
+    let y = rect.top  - h - 8;                       // prefer above the chip
+    if (y < 8) y = rect.bottom + 8;
+    x = Math.max(8, Math.min(x, window.innerWidth  - w - 8));
+    y = Math.max(8, Math.min(y, window.innerHeight - h - 8));
+    el.style.left = `${Math.round(x)}px`;
+    el.style.top  = `${Math.round(y)}px`;
+    el.classList.add('visible');
+
+    previewChipEl = chip;
+  };
+
+  if (instant) paint();
+  else previewTimer = setTimeout(paint, PREVIEW_DELAY_MS);
+}
+
+// Mouse: hover the chip (or anything inside it, incl. action buttons)
+document.addEventListener('mouseover', (e) => {
+  const chip = e.target.closest?.('.page-chip[data-action="focus-tab"]');
+  if (!chip) return;
+  if (previewChipEl === chip) return; // already handled / painting
+  showChipPreview(chip);
+});
+
+document.addEventListener('mouseout', (e) => {
+  const chip = e.target.closest?.('.page-chip[data-action="focus-tab"]');
+  if (!chip) return;
+  if (chip.contains(e.relatedTarget)) return; // still inside this chip
+  hideChipPreview();
+});
+
+// Keyboard: chips are focusable (tabindex=0); focus shows the preview
+// instantly so keyboard users get the same information without waiting.
+document.addEventListener('focusin', (e) => {
+  const chip = e.target.closest?.('.page-chip[data-action="focus-tab"]');
+  if (!chip) return;
+  showChipPreview(chip, { instant: true });
+});
+
+document.addEventListener('focusout', (e) => {
+  if (e.target.closest?.('.page-chip[data-action="focus-tab"]')) hideChipPreview();
+});
 
 
 /* ----------------------------------------------------------------
