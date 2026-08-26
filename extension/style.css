@@ -1701,3 +1701,164 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
   opacity: 0.6;
   flex-shrink: 0;
 }
+
+
+/* ================================================================
+   QUICK LINKS BAR (issue #7) — shortcuts above the grid
+   ================================================================ */
+.quick-links {
+  margin: 18px 0 14px;
+}
+
+.quick-links.collapsed .ql-chips,
+.quick-links.collapsed .ql-add-btn,
+.quick-links.collapsed .ql-add-form {
+  display: none;
+}
+
+.ql-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.ql-toggle {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ql-toggle:hover { color: var(--ink); background: rgba(154, 145, 138, 0.1); }
+
+.ql-chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+}
+
+.quick-links.collapsed .ql-chevron { transform: rotate(-90deg); }
+
+.ql-title {
+  font-family: 'Newsreader', serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.ql-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.ql-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--warm-gray);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ink);
+  max-width: 200px;
+  cursor: grab;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.ql-chip:hover {
+  border-color: var(--accent-sage);
+}
+
+.ql-chip.ql-dragging { opacity: 0.4; cursor: grabbing; }
+
+.ql-chip.ql-drop-before { box-shadow: -3px 0 0 var(--accent-amber); }
+.ql-chip.ql-drop-after  { box-shadow: 3px 0 0 var(--accent-amber); }
+
+.ql-text {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.ql-text:hover { color: var(--accent-sage); text-decoration: underline; text-underline-offset: 2px; }
+
+.ql-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 1px;
+  border-radius: 50%;
+  display: inline-flex;
+  opacity: 0.35;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.ql-remove svg { width: 11px; height: 11px; }
+
+.ql-chip:hover .ql-remove, .ql-remove:focus-visible { opacity: 1; }
+.ql-remove:hover { color: var(--status-abandoned); }
+
+.ql-add-btn {
+  background: none;
+  border: 1px dashed var(--warm-gray);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.ql-add-btn:hover { color: var(--accent-sage); border-color: var(--accent-sage); }
+
+.ql-add-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+.ql-input {
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  padding: 5px 10px;
+  border: 1px solid var(--warm-gray);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--ink);
+  outline: none;
+}
+
+.ql-input:focus { border-color: var(--accent-sage); }
+
+#qlAddUrl { width: 260px; }
+#qlAddTitle { width: 160px; }
+
+.ql-cancel:hover { color: var(--status-abandoned); }

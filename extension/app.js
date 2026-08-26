@@ -1337,6 +1337,9 @@ async function renderStaticDashboard() {
 
   // --- Render "Saved for Later" column ---
   await renderDeferredColumn();
+
+  // --- Quick links bar (also upgrades hostname-default titles to real ones) ---
+  await renderQuickLinks();
 }
 
 async function renderDashboard() {
@@ -1401,6 +1404,40 @@ document.addEventListener('click', async (e) => {
     for (const t of playing) await chrome.tabs.update(t.id, { muted: true });
     showToast(`Muted ${playing.length} playing tab${playing.length !== 1 ? 's' : ''}`);
     renderDashboard();
+    return;
+  }
+
+  // ---- Quick links bar (issue #7) ----
+  if (action === 'toggle-quick-links') {
+    const { quickLinksCollapsed = false } = await chrome.storage.local.get('quickLinksCollapsed');
+    await chrome.storage.local.set({ quickLinksCollapsed: !quickLinksCollapsed });
+    await renderQuickLinks();
+    return;
+  }
+  if (action === 'add-quick-link') {
+    const form = document.getElementById('qlAddForm');
+    if (form) {
+      form.hidden = false;
+      document.getElementById('qlAddUrl')?.focus();
+    }
+    return;
+  }
+  if (action === 'cancel-add-quick-link') {
+    const form = document.getElementById('qlAddForm');
+    if (form) { form.hidden = true; form.reset(); }
+    return;
+  }
+  if (action === 'open-quick-link') {
+    const chip = actionEl.closest('.ql-chip');
+    if (chip) await openQuickLink(chip.dataset.qlUrl);
+    return;
+  }
+  if (action === 'remove-quick-link') {
+    const id = actionEl.dataset.qlId;
+    if (!id) return;
+    await setQuickLinks((await getQuickLinks()).filter(l => l.id !== id));
+    await renderQuickLinks();
+    showToast('Shortcut removed');
     return;
   }
 
@@ -1968,6 +2005,215 @@ document.addEventListener('focusout', (e) => {
 
 
 /* ----------------------------------------------------------------
+   QUICK LINKS (issue #7)
+
+   Editable shortcut bar above the grid. Stored in chrome.storage.local
+   as a "quickLinks" array of { id, url, title }. Everything is local:
+   titles come from the user, an already-open tab's real document
+   title, or the friendly hostname — never from a network fetch. The
+   favicon is the same local chrome://favicon2 scheme the cards use.
+   ---------------------------------------------------------------- */
+
+async function getQuickLinks() {
+  const { quickLinks = [] } = await chrome.storage.local.get('quickLinks');
+  return quickLinks;
+}
+
+async function setQuickLinks(list) {
+  await chrome.storage.local.set({ quickLinks: list });
+}
+
+// Title we'd store for this URL without any live information
+function defaultQuickLinkTitle(url) {
+  try { return friendlyDomain(new URL(url).hostname); }
+  catch { return url; }
+}
+
+function normalizeQuickLinkUrl(raw) {
+  let value = (raw || '').trim();
+  if (!value) return '';
+  // "localhost:3000/dev" reads as a scheme match otherwise; typed
+  // host:port addresses are almost always meant as http.
+  if (/^[a-z0-9.-]+:\d+([/?#].*)?$/i.test(value)) value = 'http://' + value;
+  else if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) value = 'https://' + value;
+  try {
+    const u = new URL(value);
+    return (u.protocol === 'http:' || u.protocol === 'https:' ||
+            u.protocol === 'file:') ? u.href : '';
+  } catch { return ''; }
+}
+
+/**
+ * renderQuickLinks()
+ *
+ * Paints the bar from storage. As a bonus, a link whose stored title is
+ * still just the hostname default gets upgraded to the real document
+ * title once Chrome has that tab open and titled.
+ */
+async function renderQuickLinks() {
+  const section = document.getElementById('quickLinksSection');
+  const chipsEl = document.getElementById('quickLinksChips');
+  const toggle  = document.getElementById('quickLinksToggle');
+  if (!section || !chipsEl) return;
+
+  const { quickLinksCollapsed = false } = await chrome.storage.local.get('quickLinksCollapsed');
+  section.classList.toggle('collapsed', quickLinksCollapsed);
+  if (toggle) toggle.setAttribute('aria-expanded', String(!quickLinksCollapsed));
+
+  const links    = await getQuickLinks();
+  const titleFor = {};
+  for (const t of getRealTabs()) if (t.title) titleFor[t.url] = t.title;
+
+  // Upgrade hostname-default titles to real ones, silently
+  let changed = false;
+  for (const item of links) {
+    if ((!item.title || item.title === defaultQuickLinkTitle(item.url)) && titleFor[item.url]) {
+      item.title = cleanTitle(stripTitleNoise(titleFor[item.url]), '');
+      changed = true;
+    }
+  }
+  if (changed) await setQuickLinks(links);
+
+  chipsEl.innerHTML = links.map(item => {
+    const id     = escapeHtml(item.id);
+    const url    = escapeHtml(isSafeNavUrl(item.url) ? item.url : '#');
+    const title  = escapeHtml(item.title || defaultQuickLinkTitle(item.url));
+    return `<div class="ql-chip" draggable="true" data-ql-id="${id}" data-ql-url="${url}" title="${title}">
+      <img class="chip-favicon" src="${escapeHtml(localFaviconUrl(item.url))}" alt="">
+      <button class="ql-text" data-action="open-quick-link" data-ql-id="${id}">${title}</button>
+      <button class="ql-remove" data-action="remove-quick-link" data-ql-id="${id}" title="Remove shortcut">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+/**
+ * openQuickLink(url)
+ *
+ * Reuse an open tab when possible (exact URL first, then same host,
+ * via focusTab), otherwise create a new one.
+ */
+async function openQuickLink(url) {
+  if (!url) return;
+  const allTabs = await chrome.tabs.query({});
+  const hasExact = allTabs.some(t => t.url === url);
+  if (!hasExact) {
+    try {
+      const host = new URL(url).hostname;
+      const hasHost = allTabs.some(t => {
+        try { return new URL(t.url).hostname === host; } catch { return false; }
+      });
+      if (!hasHost) {
+        await chrome.tabs.create({ url, active: true });
+        return;
+      }
+    } catch {}
+  }
+  await focusTab(url);
+}
+
+// Adding a shortcut: bare "example.com" becomes https://, a live tab's
+// title fills in automatically, and re-adding an existing URL updates
+// it instead of duplicating.
+document.addEventListener('submit', async (e) => {
+  if (e.target.id !== 'qlAddForm') return;
+  e.preventDefault();
+
+  const urlInput   = document.getElementById('qlAddUrl');
+  const titleInput = document.getElementById('qlAddTitle');
+  const url = normalizeQuickLinkUrl(urlInput.value);
+  if (!url) {
+    showToast('Enter a valid web address');
+    urlInput.focus();
+    return;
+  }
+
+  const providedTitle = (titleInput.value || '').trim();
+  let title = providedTitle;
+  if (!title) {
+    const open = await chrome.tabs.query({ url });
+    const t    = open[0]?.title;
+    title = t ? cleanTitle(stripTitleNoise(t), '') : defaultQuickLinkTitle(url);
+  }
+
+  const links    = await getQuickLinks();
+  const existing = links.find(l => l.url === url);
+  if (existing) existing.title = title;
+  else links.push({ id: Date.now().toString(), url, title });
+
+  await setQuickLinks(links);
+  e.target.reset();
+  e.target.hidden = true;
+  await renderQuickLinks();
+  showToast(existing ? 'Shortcut updated' : 'Shortcut added');
+});
+
+/* ---- Quick-links drag & drop reorder (HTML5 dnd, delegated) ---- */
+let qlDragId = null;
+
+document.addEventListener('dragstart', (e) => {
+  const chip = e.target.closest?.('.ql-chip');
+  if (!chip) return;
+  qlDragId = chip.dataset.qlId;
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', qlDragId); } catch {}
+  requestAnimationFrame(() => chip.classList.add('ql-dragging'));
+});
+
+document.addEventListener('dragend', () => {
+  qlDragId = null;
+  document.querySelectorAll('.ql-chip').forEach(c =>
+    c.classList.remove('ql-dragging', 'ql-drop-before', 'ql-drop-after'));
+});
+
+document.addEventListener('dragover', (e) => {
+  if (!qlDragId) return;
+  const chipsEl = document.getElementById('quickLinksChips');
+  if (!chipsEl || !chipsEl.contains(e.target)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.ql-chip').forEach(c =>
+    c.classList.remove('ql-drop-before', 'ql-drop-after'));
+  const chip = e.target.closest('.ql-chip');
+  if (chip && chip.dataset.qlId !== qlDragId) {
+    // Left half → slot before this chip; right half → after it
+    const rect   = chip.getBoundingClientRect();
+    const before = e.clientX < rect.left + rect.width / 2;
+    chip.classList.toggle('ql-drop-before', before);
+    chip.classList.toggle('ql-drop-after', !before);
+  }
+});
+
+document.addEventListener('drop', async (e) => {
+  if (!qlDragId) return;
+  const chipsEl = document.getElementById('quickLinksChips');
+  if (!chipsEl || !chipsEl.contains(e.target)) return;
+  e.preventDefault();
+
+  const dragId = qlDragId;
+  qlDragId     = null;
+  const target = e.target.closest('.ql-chip');
+  const links  = await getQuickLinks();
+  const from   = links.findIndex(l => l.id === dragId);
+  if (from === -1) { renderQuickLinks(); return; }
+  const [moved] = links.splice(from, 1);
+
+  if (!target || target.dataset.qlId === dragId || links.length === 0) {
+    links.push(moved); // dropped past the last chip
+  } else {
+    let to = links.findIndex(l => l.id === target.dataset.qlId);
+    if (!target.classList.contains('ql-drop-before')) to += 1;
+    if (to < 0) to = 0;
+    links.splice(to, 0, moved);
+  }
+
+  await setQuickLinks(links);
+  await renderQuickLinks();
+});
+
+
+/* ----------------------------------------------------------------
    SESSION SNAPSHOTS (issue #1) — panel + restore.
 
    The engine lives in background.js (event-driven capture with
@@ -2294,6 +2540,7 @@ setInterval(async () => {
 async function init() {
   initThemeSwitcher();
   updateSnapDot();
+  renderQuickLinks();
 
   // Reflect the stored takeover setting in the toggle
   const { takeoverNewTab = true } = await chrome.storage.local.get('takeoverNewTab');

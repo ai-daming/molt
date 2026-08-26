@@ -96,6 +96,30 @@
   </div>
 
   <!-- ================================================================
+       QUICK LINKS BAR (issue #7) — editable shortcuts above the grid
+       Chips + add/collapse are rendered and handled by app.js
+       ================================================================ -->
+  <div class="quick-links" id="quickLinksSection">
+    <div class="ql-head">
+      <button class="ql-toggle" id="quickLinksToggle" data-action="toggle-quick-links"
+              aria-expanded="true" title="Collapse quick links">
+        <svg class="ql-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+      </button>
+      <h2 class="ql-title">Quick links</h2>
+      <div class="ql-chips" id="quickLinksChips"></div>
+      <button class="ql-add-btn" data-action="add-quick-link" title="Add shortcut">＋</button>
+    </div>
+    <form class="ql-add-form" id="qlAddForm" hidden>
+      <input type="text" id="qlAddUrl" class="ql-input" placeholder="https://example.com"
+             autocomplete="off" spellcheck="false" required>
+      <input type="text" id="qlAddTitle" class="ql-input" placeholder="Name (optional)"
+             autocomplete="off" spellcheck="false">
+      <button type="submit" class="action-btn">Add</button>
+      <button type="button" class="action-btn ql-cancel" data-action="cancel-add-quick-link">Cancel</button>
+    </form>
+  </div>
+
+  <!-- ================================================================
        MAIN CONTENT AREA — two-column layout
        Left: open tabs (domain/mission cards)
        Right: saved for later checklist
