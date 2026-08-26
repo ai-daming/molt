@@ -160,7 +160,11 @@ const I18N = (() => {
       'theme.group':    'Theme',
 
       // Landing group label + misc
-      'group.homepages': 'Homepages',
+      'group.homepages':     'Homepages',
+      'group.create':        'Create tab group',
+      'group.createTitle':   "Put this site's tabs into a native Chrome tab group",
+      'group.created':       { one: 'Grouped {n} tab', other: 'Grouped {n} tabs' },
+      'group.createFailed':  "Couldn't create the tab group",
       'footer.statLabel':'Open tabs',
     },
 
@@ -283,7 +287,11 @@ const I18N = (() => {
       'theme.forest':   '松林',
       'theme.group':    '主题',
 
-      'group.homepages': '首页',
+      'group.homepages':     '首页',
+      'group.create':        '转为标签组',
+      'group.createTitle':   '把这个站点的标签页在 Chrome 标签条上编为一个原生标签组',
+      'group.created':       '已将 {n} 个标签页编入标签组',
+      'group.createFailed':  '创建标签组失败',
       'footer.statLabel':'打开的标签页',
     },
   };

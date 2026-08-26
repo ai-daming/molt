@@ -7,7 +7,8 @@
   "permissions": [
     "tabs",
     "activeTab",
-    "storage"
+    "storage",
+    "tabGroups"
   ],
   "chrome_url_overrides": {
     "newtab": "index.html"

@@ -45,6 +45,40 @@ async function loadLockedTabs() {
   }
 }
 
+// Native Chrome tab-group metadata (issue #5): id → {title, color}.
+// Refreshed on every tab sweep; renders read it for chip badges.
+let tabGroupMeta = new Map();
+
+async function loadTabGroupMeta() {
+  try {
+    const groups = await chrome.tabGroups.query({});
+    tabGroupMeta = new Map(groups.map(g => [g.id, g]));
+  } catch {
+    // tabGroups API unavailable — chips just won't show group badges
+  }
+}
+
+// Chrome's nine native group colors as CSS-friendly hex approximations
+const GROUP_COLOR_HEX = {
+  grey:   '#9aa0a6',
+  blue:   '#8ab4f8',
+  red:    '#f28b82',
+  yellow: '#fdd663',
+  green:  '#81c995',
+  pink:   '#f88bbd',
+  purple: '#c58af9',
+  cyan:   '#78d9ec',
+  orange: '#fcad70',
+};
+const GROUP_COLOR_NAMES = Object.keys(GROUP_COLOR_HEX);
+
+/** Small stable hash so a domain always picks the same group color. */
+function stringHash(str) {
+  let h = 0;
+  for (const c of String(str || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h;
+}
+
 // Browser-builtin new-tab URLs across Chromium variants (Chrome, Edge,
 // Brave). The extension page URL itself is also treated as Tab Out.
 const BROWSER_NEWTAB_URLS = [
@@ -61,9 +95,9 @@ const BROWSER_NEWTAB_URLS = [
  * Sets the extensionId flag so we can identify Tab Out's own pages.
  */
 async function fetchOpenTabs() {
-  // Refresh the lock set on every tab sweep — renders downstream of this
-  // call (domain cards, overflow chips) read `lockedUrls` for chip state.
-  await loadLockedTabs();
+  // Refresh the lock set + native-group metadata on every tab sweep —
+  // renders downstream read `lockedUrls` and `tabGroupMeta` for chip state.
+  await Promise.all([loadLockedTabs(), loadTabGroupMeta()]);
   try {
     const extensionId = chrome.runtime.id;
     // The new URL for this page is now index.html (not newtab.html)
@@ -78,6 +112,7 @@ async function fetchOpenTabs() {
       active:   t.active,
       audible:  !!t.audible,
       muted:    !!(t.mutedInfo && t.mutedInfo.muted),
+      groupId:  typeof t.groupId === 'number' ? t.groupId : -1,
       // Flag Tab Out's own pages so we can detect duplicate new tabs
       isTabOut: t.url === newtabUrl || BROWSER_NEWTAB_URLS.includes(t.url),
     }));
@@ -85,6 +120,20 @@ async function fetchOpenTabs() {
     // chrome.tabs API unavailable (shouldn't happen in an extension page)
     openTabs = [];
   }
+}
+
+/**
+ * groupBadgeHtml(tab)
+ *
+ * Colored-dot + name pill for chips that belong to a native Chrome
+ * tab group. Untitled groups show just the dot.
+ */
+function groupBadgeHtml(tab) {
+  const g = tab.groupId !== -1 ? tabGroupMeta.get(tab.groupId) : null;
+  if (!g) return '';
+  const color = GROUP_COLOR_HEX[g.color] || GROUP_COLOR_HEX.grey;
+  const name = g.title ? escapeHtml(g.title) : '';
+  return `<span class="chip-group-badge" title="${name}"><span class="chip-group-dot" style="background:${color}"></span><span class="chip-group-name">${name}</span></span>`;
 }
 
 /**
@@ -796,6 +845,7 @@ const ICONS = {
   audioOff: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>`,
   lock:     `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`,
   lockOpen: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`,
+  group:   `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>`,
 };
 
 
@@ -870,9 +920,10 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
       ? `<button class="chip-audio${mutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${mutedNow ? t('chip.audioMutedTitle') : t('chip.audioOnTitle')}" >${mutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
       : '';
     const lockedNow  = lockedUrls.has(tab.url);
+    const grpTag     = groupBadgeHtml(tab);
     return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" tabindex="0" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
-      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
+      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${grpTag}${audioTag}
       <div class="chip-actions">
         <button class="chip-action chip-lock${lockedNow ? ' is-locked' : ''}" data-action="toggle-lock-tab" data-tab-url="${safeUrl}" title="${lockedNow ? t('chip.lockedTitle') : t('chip.lockTitle')}">
           ${lockedNow ? ICONS.lock : ICONS.lockOpen}
@@ -965,12 +1016,13 @@ function renderDomainCard(group) {
       ? `<button class="chip-audio${isMutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${isMutedNow ? t('chip.audioMutedTitle') : t('chip.audioOnTitle')}" >${isMutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
       : '';
     const lockedNow  = lockedUrls.has(tab.url);
+    const grpTag     = groupBadgeHtml(tab);
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = tab.url ? localFaviconUrl(tab.url) : '';
     return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" tabindex="0" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
-      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
+      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${grpTag}${audioTag}
       <div class="chip-actions">
         <button class="chip-action chip-lock${lockedNow ? ' is-locked' : ''}" data-action="toggle-lock-tab" data-tab-url="${safeUrl}" title="${lockedNow ? t('chip.lockedTitle') : t('chip.lockTitle')}">
           ${lockedNow ? ICONS.lock : ICONS.lockOpen}
@@ -985,7 +1037,13 @@ function renderDomainCard(group) {
     </div>`;
   }).join('') + (extraCount > 0 ? buildOverflowChips(uniqueTabs.slice(8), urlCounts) : '');
 
+  const groupTitle = isLanding ? t('group.homepages') : (group.label || friendlyDomain(group.domain));
   let actionsHtml = `
+    <button class="action-btn" data-action="create-tab-group" data-domain-id="${stableId}"
+            title="${escapeHtml(t('group.createTitle'))}">
+      ${ICONS.group}
+      ${escapeHtml(t('group.create'))}
+    </button>
     <button class="action-btn close-tabs" data-action="close-domain-tabs" data-domain-id="${stableId}">
       ${ICONS.close}
       ${escapeHtml(tCount('tabs.closeAll', tabCount))}
@@ -1442,6 +1500,50 @@ document.addEventListener('click', async (e) => {
     await setQuickLinks((await getQuickLinks()).filter(l => l.id !== id));
     await renderQuickLinks();
     showToast(t('quick.removed'));
+    return;
+  }
+
+  // ---- Turn a domain card into a native Chrome tab group (issue #5) ----
+  if (action === 'create-tab-group') {
+    const domainId = actionEl.dataset.domainId;
+    const grp = domainGroups.find(g =>
+      'domain-' + g.domain.replace(/[^a-z0-9]/g, '-') === domainId);
+    if (!grp || grp.tabs.length === 0) return;
+
+    const urlSet   = new Set(grp.tabs.map(t => t.url));
+    const liveTabs = (await chrome.tabs.query({})).filter(t => urlSet.has(t.url));
+    if (liveTabs.length === 0) return;
+
+    const title = grp.domain === '__landing-pages__'
+      ? t('group.homepages')
+      : (grp.label || friendlyDomain(grp.domain));
+    const color = GROUP_COLOR_NAMES[stringHash(grp.domain || title) % GROUP_COLOR_NAMES.length];
+
+    // tabs.group() requires all tabs to share a window; domain cards can
+    // span windows, so group each window's share under the same name.
+    const byWindow = new Map();
+    for (const t of liveTabs) {
+      if (!byWindow.has(t.windowId)) byWindow.set(t.windowId, []);
+      byWindow.get(t.windowId).push(t.id);
+    }
+
+    let grouped = 0;
+    let anyGrouped = false;
+    for (const ids of byWindow.values()) {
+      try {
+        const gid = await chrome.tabs.group({ tabIds: ids });
+        await chrome.tabGroups.update(gid, { title, color });
+        grouped += ids.length;
+        anyGrouped = true;
+      } catch {
+        // A window failing (e.g. a minimized/tab-strip quirk) must not
+        // stop the others
+      }
+    }
+
+    showToast(anyGrouped ? tCount('group.created', grouped) : t('group.createFailed'));
+    await fetchOpenTabs();
+    renderDashboard();
     return;
   }
 
@@ -2424,11 +2526,16 @@ function updatePickCount(item) {
  * Restores all tabs, or the given subset. Tabs are grouped by the window
  * they belonged to when the snapshot was taken and re-created window by
  * window (fidelity: window assignment + pinned state are preserved).
+ *
+ * Native Chrome tab groups ride along (issue #5): tabs sharing a
+ * groupId in the snapshot are re-grouped inside their restored window,
+ * given the recorded title and color from snap.groups.
  */
 async function restoreSnapshot(snap, urls) {
   const wanted = urls ? new Set(urls) : null;
   const tabsToRestore = snap.tabs.filter(t => !wanted || wanted.has(t.url));
   if (tabsToRestore.length === 0) return 0;
+  const groupMeta = snap.groups || {};
 
   // A single tab just opens in the current window
   if (tabsToRestore.length === 1) {
@@ -2452,13 +2559,50 @@ async function restoreSnapshot(snap, urls) {
       try { await chrome.tabs.update(win.tabs[0].id, { pinned: true }); } catch {}
     }
     restored++;
+    // newTabIdsByGroup: old groupId → ids of the fresh tabs carrying it
+    const newTabIdsByGroup = new Map();
+    collectNewTabId(newTabIdsByGroup, gtabs[0], win.tabs[0].id);
     for (const t of gtabs.slice(1)) {
-      await chrome.tabs.create({ windowId: win.id, url: t.url, pinned: !!t.pinned, active: false });
+      const created = await chrome.tabs.create({
+        windowId: win.id, url: t.url, pinned: !!t.pinned, active: false,
+      });
+      collectNewTabId(newTabIdsByGroup, t, created.id);
       restored++;
     }
+    await regroupRestoredTabs(newTabIdsByGroup, groupMeta);
     first = false;
   }
   return restored;
+}
+
+function collectNewTabId(map, snapTab, newTabId) {
+  if (snapTab && typeof snapTab.groupId === 'number' && snapTab.groupId !== -1) {
+    if (!map.has(snapTab.groupId)) map.set(snapTab.groupId, []);
+    map.get(snapTab.groupId).push(newTabId);
+  }
+}
+
+/**
+ * regroupRestoredTabs(byOldGroup, groupMeta)
+ *
+ * Re-creates native groups from a restore batch: one real group per old
+ * groupId that has metadata, named and colored as recorded. Old groupIds
+ * are meaningless after restore — everything maps to fresh groups.
+ */
+async function regroupRestoredTabs(byOldGroup, groupMeta) {
+  for (const [oldGid, tabIds] of byOldGroup) {
+    const info = groupMeta[oldGid];
+    if (!info || tabIds.length === 0) continue;
+    try {
+      const gid = await chrome.tabs.group({ tabIds });
+      const patch = {};
+      if (info.title) patch.title = info.title;
+      if (info.color) patch.color = info.color;
+      if (Object.keys(patch).length > 0) await chrome.tabGroups.update(gid, patch);
+    } catch {
+      // Grouping loss is cosmetic — never fail the restore over it
+    }
+  }
 }
 
 // Click on the dimmed backdrop closes the panel
@@ -2518,6 +2662,12 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
   if (!('audible' in info) && !('mutedInfo' in info)) return;
   scheduleAudioRefresh();
 });
+
+// Renaming / recoloring / grouping while the dashboard is open should
+// show up without waiting for the next render cycle
+if (chrome.tabGroups?.onUpdated) {
+  chrome.tabGroups.onUpdated.addListener(() => scheduleAudioRefresh());
+}
 
 setInterval(async () => {
   // Don't yank the page out from under an in-progress interaction

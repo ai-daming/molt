@@ -126,10 +126,30 @@ function snapSignature(tabs) {
   return tabs.map(t => `${t.pinned ? 'p' : '-'}|${t.url}|${t.groupId ?? -1}`).sort().join('\n');
 }
 
+/**
+ * captureGroupMeta()
+ *
+ * Native tab-group titles/colors keyed by group id, stored alongside a
+ * snapshot so a later restore can re-create the groups (issue #5).
+ */
+async function captureGroupMeta() {
+  try {
+    const meta = {};
+    for (const g of await chrome.tabGroups.query({})) {
+      if (g.title || g.color) {
+        meta[g.id] = { title: g.title || '', color: g.color };
+      }
+    }
+    return meta;
+  } catch {
+    // tabGroups API unavailable — snapshot still stores plain tabs
+    return {};
+  }
+}
+
 async function captureSnapshot() {
   try {
-    const all = await chrome.tabs.query({});
-    const real = all
+    const all = await chrome.tabs.query({});    const real = all
       .filter(isRealWebTab)
       .map(t => ({
         url: t.url, title: t.title || '', pinned: !!t.pinned,
@@ -154,6 +174,11 @@ async function captureSnapshot() {
       sig,
       windows: new Set(real.map(t => t.windowId)).size,
       tabs: real,
+      // Native group titles/colors keyed by the groupId on each tab
+      // (issue #5), so restore can re-create the grouping. Snapshots
+      // taken before this field existed simply lack `groups`; restore
+      // must tolerate its absence.
+      groups: await captureGroupMeta(),
     });
     await chrome.storage.local.set({ [SNAPSHOT_KEY]: { snapshots: applyRetention(snaps) } });
     snapLastWrite = Date.now();

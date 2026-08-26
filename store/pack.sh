@@ -81,9 +81,9 @@ assert en['moltName']['message'].startswith('Molt'), "英文名必须以 Molt �
 for label, loc in (('en', en), ('zh_CN', zh)):
     d = loc['moltDescription']['message']
     assert len(d) <= 132, f"{label} description {len(d)} > 132"
-assert m['permissions'] == ['tabs', 'activeTab', 'storage'], f"权限变了: {m['permissions']}"
+assert m['permissions'] == ['tabs', 'activeTab', 'storage', 'tabGroups'], f"权限变了: {m['permissions']}"
 EOF
-pass "manifest：双语 _locales / v$VERSION / 描述≤132 / Alt+T / 权限最小集"
+pass "manifest：双语 _locales / v$VERSION / 描述≤132 / Alt+T / 权限集(+已确认的 tabGroups #5)"
 
 # 7. 隐私排除项：私有配置与杂文件不得混入
 [ ! -e "$TMP/config.local.js" ] || fail "config.local.js 混入了发布包！"

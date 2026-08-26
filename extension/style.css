@@ -1862,3 +1862,32 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
 #qlAddTitle { width: 160px; }
 
 .ql-cancel:hover { color: var(--status-abandoned); }
+
+
+/* ---- Native tab-group badge on chips (issue #5) ---- */
+.chip-group-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted);
+  border: 1px solid var(--warm-gray);
+  border-radius: 999px;
+  padding: 0 7px;
+  line-height: 16px;
+  max-width: 140px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chip-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip-group-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
