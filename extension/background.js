@@ -98,31 +98,125 @@ chrome.commands.onCommand.addListener((command) => {
   if (command === 'open-dashboard') focusOrOpenDashboard();
 });
 
+// ─── Session snapshots (issue #1) ─────────────────────────────────────────────
+
+/**
+ * Event-driven snapshots of all open tabs, kept in chrome.storage.local.
+ * Listeners are registered at the top level, so MV3 waking the service
+ * worker after it has been recycled re-registers them — snapshots keep
+ * working across service-worker shutdowns.
+ */
+const SNAPSHOT_KEY       = 'sessionSnapshots';
+const SNAPSHOT_THROTTLE  = 10 * 1000; // merge bursts of tab changes
+const SNAPSHOT_MAX_COUNT = 400;
+
+let snapTrailingTimer = null;
+let snapLastWrite     = 0;
+
+function isRealWebTab(t) {
+  const url = t.url || '';
+  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://');
+}
+
+// Content signature: identical consecutive states are not stored twice.
+// windowId is deliberately excluded — it changes every browser restart.
+function snapSignature(tabs) {
+  return tabs.map(t => `${t.pinned ? 'p' : '-'}|${t.url}`).sort().join('\n');
+}
+
+async function captureSnapshot() {
+  try {
+    const all = await chrome.tabs.query({});
+    const real = all
+      .filter(isRealWebTab)
+      .map(t => ({
+        url: t.url, title: t.title || '', pinned: !!t.pinned,
+        windowId: t.windowId, index: t.index,
+      }))
+      .sort((a, b) => a.index - b.index);
+    if (real.length === 0) return;
+
+    const { [SNAPSHOT_KEY]: data = {} } = await chrome.storage.local.get(SNAPSHOT_KEY);
+    const snaps = data.snapshots || [];
+    const sig = snapSignature(real);
+    if (snaps.length > 0 && snaps[snaps.length - 1].sig === sig) {
+      snapLastWrite = Date.now();
+      return;
+    }
+
+    snaps.push({
+      id: nowISO(),
+      sig,
+      windows: new Set(real.map(t => t.windowId)).size,
+      tabs: real,
+    });
+    await chrome.storage.local.set({ [SNAPSHOT_KEY]: { snapshots: applyRetention(snaps) } });
+    snapLastWrite = Date.now();
+  } catch {
+    // A failed snapshot must never interfere with anything else
+  }
+}
+
+// Keep everything from the last 48 h, then one snapshot per day, capped.
+function applyRetention(snaps) {
+  const cutoff = Date.now() - 48 * 3600 * 1000;
+  const recent = snaps.filter(s => +new Date(s.id) >= cutoff);
+  const older  = snaps.filter(s => +new Date(s.id) < cutoff);
+  const lastPerDay = new Map(); // snaps are chronological — last write wins
+  for (const s of older) lastPerDay.set(s.id.slice(0, 10), s);
+  const kept = [...recent, ...lastPerDay.values()];
+  return kept.length > SNAPSHOT_MAX_COUNT
+    ? kept.slice(kept.length - SNAPSHOT_MAX_COUNT)
+    : kept;
+}
+
+function nowISO() { return new Date().toISOString(); }
+
+/**
+ * Leading + trailing throttle. The leading edge matters for disaster
+ * recovery: when a burst of closes starts ("Close all 87 tabs"), we
+ * snapshot right away — capturing the near-pre-disaster state — and the
+ * trailing edge records the settled state once things go quiet.
+ */
+function scheduleSnapshot() {
+  if (Date.now() - snapLastWrite >= SNAPSHOT_THROTTLE) {
+    captureSnapshot();
+  } else {
+    clearTimeout(snapTrailingTimer);
+    snapTrailingTimer = setTimeout(captureSnapshot, SNAPSHOT_THROTTLE);
+  }
+}
+
 // ─── Event listeners ──────────────────────────────────────────────────────────
 
-// Update badge when the extension is first installed
+// Update badge + snapshot when the extension is first installed
 chrome.runtime.onInstalled.addListener(() => {
   updateBadge();
+  scheduleSnapshot();
 });
 
-// Update badge when Chrome starts up
+// Update badge + snapshot when Chrome starts up
 chrome.runtime.onStartup.addListener(() => {
   updateBadge();
+  scheduleSnapshot();
 });
 
-// Update badge whenever a tab is opened
+// Update badge + snapshot whenever a tab is opened
 chrome.tabs.onCreated.addListener(() => {
   updateBadge();
+  scheduleSnapshot();
 });
 
-// Update badge whenever a tab is closed
+// Update badge + snapshot whenever a tab is closed
 chrome.tabs.onRemoved.addListener(() => {
   updateBadge();
+  scheduleSnapshot();
 });
 
-// Update badge when a tab's URL changes (e.g. navigating to/from chrome://)
+// Update badge + snapshot when a tab's URL changes (e.g. navigating to/from chrome://)
 chrome.tabs.onUpdated.addListener(() => {
   updateBadge();
+  scheduleSnapshot();
 });
 
 // ─── Initial run ─────────────────────────────────────────────────────────────

@@ -53,6 +53,13 @@
           <span class="theme-swatch theme-swatch-forest"></span>
         </button>
       </div>
+      <!-- Session snapshots (issue #1) — panel rendering in app.js -->
+      <button class="snapshots-btn" data-action="toggle-snapshots" title="Session snapshots">
+        <span class="snap-dot" id="snapDot" hidden></span>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+      </button>
       <!-- Settings (new tab takeover toggle) — handlers in app.js -->
       <button class="settings-btn" data-action="toggle-settings" title="Settings" aria-haspopup="true" aria-expanded="false">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
@@ -154,6 +161,28 @@
   </footer>
 
 </div><!-- end .container -->
+
+<!-- ================================================================
+     SESSION SNAPSHOT PANEL (issue #1) — rows injected by app.js
+     ================================================================ -->
+<div class="snapshot-overlay" id="snapshotOverlay">
+  <div class="snapshot-panel">
+    <div class="snapshot-head">
+      <div>
+        <div class="snapshot-title">Session snapshots</div>
+        <div class="snapshot-sub">Auto-saved as your tabs change &nbsp;·&nbsp; 100% local, nothing leaves your machine</div>
+      </div>
+      <button class="snapshot-close" data-action="close-snapshots" title="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+    <div class="snapshot-storage" id="snapshotStorage" hidden></div>
+    <div id="snapshotGroups"></div>
+    <div class="snapshot-retention">
+      Keeps every change today &nbsp;·&nbsp; snapshots for the last 48 h &nbsp;·&nbsp; one per day after that
+    </div>
+  </div>
+</div>
 
 <!-- ================================================================
      TOAST — floats above everything, used for action confirmations

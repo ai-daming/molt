@@ -1338,6 +1338,58 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  // ---- Session snapshots panel ----
+  if (action === 'toggle-snapshots') {
+    const ov = document.getElementById('snapshotOverlay');
+    if (ov && ov.classList.contains('open')) closeSnapshots();
+    else await openSnapshots();
+    return;
+  }
+  if (action === 'close-snapshots') {
+    closeSnapshots();
+    return;
+  }
+  if (action === 'snapshot-pick-toggle') {
+    expandedSnapId = (expandedSnapId === actionEl.dataset.snapId) ? null : actionEl.dataset.snapId;
+    await renderSnapshotPanel();
+    return;
+  }
+  if (action === 'snapshot-cancel-pick') {
+    expandedSnapId = null;
+    await renderSnapshotPanel();
+    return;
+  }
+  if (action === 'snapshot-domain-all') {
+    const item = actionEl.closest('.snapshot-item');
+    const domain = actionEl.dataset.domain;
+    if (item && domain) {
+      const rows = [...item.querySelectorAll('.picker-row')].filter(r => r.dataset.domain === domain);
+      if (rows.length > 0) {
+        const target = !rows.every(r => r.querySelector('.snap-check').checked);
+        rows.forEach(r => { r.querySelector('.snap-check').checked = target; });
+        updatePickCount(item);
+      }
+    }
+    return;
+  }
+  if (action === 'snapshot-restore-all' || action === 'snapshot-restore-sel') {
+    const snap = (await getSnapshots()).find(s => s.id === actionEl.dataset.snapId);
+    if (!snap) return;
+    let urls = null;
+    if (action === 'snapshot-restore-sel') {
+      const item = actionEl.closest('.snapshot-item');
+      urls = [...item.querySelectorAll('.snap-check:checked')].map(c => c.dataset.url);
+      if (urls.length === 0) return;
+    }
+    actionEl.disabled = true;
+    actionEl.textContent = 'Restoring…';
+    const n = await restoreSnapshot(snap, urls);
+    closeSnapshots();
+    showToast(`Restored ${n} tab${n !== 1 ? 's' : ''} from ${fmtSnapTime(snap.id)}`);
+    renderDashboard();
+    return;
+  }
+
   // ---- Close duplicate Tab Out tabs ----
   if (action === 'close-tabout-dupes') {
     await closeTabOutDupes();
@@ -1642,6 +1694,11 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
+  // Escape closes the snapshot panel first, then the search box
+  if (e.key === 'Escape') {
+    const ov = document.getElementById('snapshotOverlay');
+    if (ov && ov.classList.contains('open')) { closeSnapshots(); return; }
+  }
   const searchEl = document.getElementById('tabSearch');
   if (!searchEl) return;
   const active   = document.activeElement;
@@ -1672,6 +1729,261 @@ document.addEventListener('error', (e) => {
   const el = e.target;
   if (el && el.tagName === 'IMG') el.style.display = 'none';
 }, true);
+
+
+/* ----------------------------------------------------------------
+   SESSION SNAPSHOTS (issue #1) — panel + restore.
+
+   The engine lives in background.js (event-driven capture with
+   leading+trailing throttle and rolling retention). This section
+   renders the panel from chrome.storage.local and restores snapshots,
+   grouped by their original windows, preserving pinned state.
+   ---------------------------------------------------------------- */
+const SNAP_KEY = 'sessionSnapshots';
+const SNAP_SEEN_KEY = 'tab-out-snap-seen';
+let expandedSnapId = null;
+
+async function getSnapshots() {
+  const { [SNAP_KEY]: data = {} } = await chrome.storage.local.get(SNAP_KEY);
+  return data.snapshots || [];
+}
+
+// Local-calendar-day key (UTC slice would misgroup snapshots near midnight)
+function localDayKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function dayLabel(key) {
+  if (key === localDayKey(new Date())) return 'Today';
+  if (key === localDayKey(new Date(Date.now() - 86_400_000))) return 'Yesterday';
+  const [y, m, d] = key.split('-');
+  return new Date(+y, +m - 1, +d, 12).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function fmtSnapTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function relTime(iso) {
+  const ms = Date.now() - +new Date(iso);
+  if (ms < 60_000) return 'just now';
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
+  return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function fmtBytes(b) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function domainOf(url) { try { return new URL(url).hostname; } catch { return ''; } }
+
+const AV_COLORS = ['#24292f', '#c4302b', '#ea4335', '#1da1f2', '#5a7a62', '#5a6b7a', '#b35a5a', '#c8713a'];
+function avatarHtml(domain) {
+  if (!domain) return '';
+  const clean = domain.replace(/^www\./, '');
+  let h = 0;
+  for (const c of clean) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const letter = clean[0] ? clean[0].toUpperCase() : '?';
+  return `<span class="mini-avatar" style="background:${AV_COLORS[h % AV_COLORS.length]}">${escapeHtml(letter)}</span>`;
+}
+
+function updateSnapDot() {
+  const dot = document.getElementById('snapDot');
+  if (!dot) return;
+  getSnapshots().then(snaps => {
+    if (snaps.length === 0) { dot.hidden = true; return; }
+    let seen = null;
+    try { seen = localStorage.getItem(SNAP_SEEN_KEY); } catch {}
+    dot.hidden = snaps[snaps.length - 1].id === seen;
+  });
+}
+
+async function openSnapshots() {
+  const ov = document.getElementById('snapshotOverlay');
+  if (!ov) return;
+  ov.classList.add('open');
+  await renderSnapshotPanel();
+  const snaps = await getSnapshots();
+  if (snaps.length > 0) {
+    try { localStorage.setItem(SNAP_SEEN_KEY, snaps[snaps.length - 1].id); } catch {}
+  }
+  updateSnapDot();
+}
+
+function closeSnapshots() {
+  const ov = document.getElementById('snapshotOverlay');
+  if (ov) ov.classList.remove('open');
+}
+
+async function renderSnapshotPanel() {
+  const groupsEl  = document.getElementById('snapshotGroups');
+  const storageEl = document.getElementById('snapshotStorage');
+  if (!groupsEl) return;
+
+  const snaps = (await getSnapshots()).slice().reverse(); // newest first
+
+  if (storageEl) {
+    try {
+      const bytes = await chrome.storage.local.getBytesInUse(SNAP_KEY);
+      storageEl.textContent = `${snaps.length} snapshot${snaps.length !== 1 ? 's' : ''} kept · ~${fmtBytes(bytes)}`;
+    } catch {
+      storageEl.textContent = `${snaps.length} snapshot${snaps.length !== 1 ? 's' : ''} kept`;
+    }
+    storageEl.hidden = false;
+  }
+
+  if (snaps.length === 0) {
+    groupsEl.innerHTML = '<div class="search-empty">Nothing here yet — snapshots are taken automatically as your tabs change.</div>';
+    return;
+  }
+
+  const dayGroups = new Map();
+  for (const s of snaps) {
+    const k = localDayKey(new Date(s.id));
+    if (!dayGroups.has(k)) dayGroups.set(k, []);
+    dayGroups.get(k).push(s);
+  }
+
+  let html = '';
+  for (const [k, list] of dayGroups) {
+    html += `<div class="snapshot-group-label">${escapeHtml(dayLabel(k))}</div>`;
+    html += list.map(renderSnapshotItem).join('');
+  }
+  groupsEl.innerHTML = html;
+}
+
+function renderSnapshotItem(s) {
+  const seen = new Set();
+  const domains = [];
+  for (const t of s.tabs) {
+    const d = domainOf(t.url);
+    if (d && !seen.has(d)) { seen.add(d); domains.push(d); }
+  }
+  const avatars = domains.slice(0, 5).map(avatarHtml).join('');
+  const more = domains.length > 5 ? `<span class="snapshot-more">+${domains.length - 5}</span>` : '';
+  const idAttr = escapeHtml(s.id);
+  const picker = expandedSnapId === s.id ? renderSnapshotPicker(s) : '';
+
+  return `
+  <div class="snapshot-item" data-snap-id="${idAttr}">
+    <div class="snapshot-when">
+      <div class="snapshot-time">${escapeHtml(fmtSnapTime(s.id))}</div>
+      <div class="snapshot-date">${escapeHtml(relTime(s.id))}</div>
+    </div>
+    <div class="snapshot-what">
+      <div class="snapshot-meta"><b>${s.tabs.length} tab${s.tabs.length !== 1 ? 's' : ''}</b> · ${s.windows} window${s.windows !== 1 ? 's' : ''} · ${domains.length} site${domains.length !== 1 ? 's' : ''}</div>
+      <div class="snapshot-domains">${avatars}${more}</div>
+      ${picker}
+    </div>
+    <div class="snapshot-actions">
+      <button class="snap-btn" data-action="snapshot-pick-toggle" data-snap-id="${idAttr}">${expandedSnapId === s.id ? 'Hide picker' : 'Pick tabs…'}</button>
+      <button class="snap-btn primary" data-action="snapshot-restore-all" data-snap-id="${idAttr}">Restore all</button>
+    </div>
+  </div>`;
+}
+
+function renderSnapshotPicker(s) {
+  const byDomain = new Map();
+  for (const t of s.tabs) {
+    const d = domainOf(t.url) || '(other)';
+    if (!byDomain.has(d)) byDomain.set(d, []);
+    byDomain.get(d).push(t);
+  }
+
+  let rows = '';
+  for (const [d, tabs] of byDomain) {
+    rows += `
+      <div class="picker-domain">
+        ${avatarHtml(d)}
+        <span>${escapeHtml(d)}</span>
+        <button class="pick-all" data-action="snapshot-domain-all" data-snap-id="${escapeHtml(s.id)}" data-domain="${escapeHtml(d)}">select all</button>
+      </div>`;
+    rows += tabs.map(t => `
+      <label class="picker-row" data-domain="${escapeHtml(domainOf(t.url) || '(other)')}">
+        <input type="checkbox" class="snap-check" data-url="${escapeHtml(t.url)}">
+        <span class="p-title" title="${escapeHtml(t.title || t.url)}">${escapeHtml(t.title || t.url)}</span>
+        <span class="p-url">${escapeHtml(t.url)}</span>
+      </label>`).join('');
+  }
+
+  return `
+  <div class="snapshot-picker">
+    ${rows}
+    <div class="picker-foot">
+      <button class="snap-btn" data-action="snapshot-cancel-pick" data-snap-id="${escapeHtml(s.id)}">Cancel</button>
+      <button class="snap-btn primary snap-restore-sel" data-action="snapshot-restore-sel" data-snap-id="${escapeHtml(s.id)}" disabled>Restore 0 selected</button>
+    </div>
+  </div>`;
+}
+
+function updatePickCount(item) {
+  if (!item) return;
+  const n = item.querySelectorAll('.snap-check:checked').length;
+  const btn = item.querySelector('.snap-restore-sel');
+  if (btn) {
+    btn.textContent = `Restore ${n} selected`;
+    btn.disabled = n === 0;
+  }
+}
+
+/**
+ * restoreSnapshot(snap, urls?)
+ *
+ * Restores all tabs, or the given subset. Tabs are grouped by the window
+ * they belonged to when the snapshot was taken and re-created window by
+ * window (fidelity: window assignment + pinned state are preserved).
+ */
+async function restoreSnapshot(snap, urls) {
+  const wanted = urls ? new Set(urls) : null;
+  const tabsToRestore = snap.tabs.filter(t => !wanted || wanted.has(t.url));
+  if (tabsToRestore.length === 0) return 0;
+
+  // A single tab just opens in the current window
+  if (tabsToRestore.length === 1) {
+    const t = tabsToRestore[0];
+    await chrome.tabs.create({ url: t.url, pinned: !!t.pinned, active: true });
+    return 1;
+  }
+
+  const winGroups = new Map();
+  for (const t of tabsToRestore) {
+    if (!winGroups.has(t.windowId)) winGroups.set(t.windowId, []);
+    winGroups.get(t.windowId).push(t);
+  }
+
+  let restored = 0;
+  let first = true;
+  for (const gtabs of winGroups.values()) {
+    gtabs.sort((a, b) => a.index - b.index);
+    const win = await chrome.windows.create({ url: gtabs[0].url, focused: first });
+    if (gtabs[0].pinned) {
+      try { await chrome.tabs.update(win.tabs[0].id, { pinned: true }); } catch {}
+    }
+    restored++;
+    for (const t of gtabs.slice(1)) {
+      await chrome.tabs.create({ windowId: win.id, url: t.url, pinned: !!t.pinned, active: false });
+      restored++;
+    }
+    first = false;
+  }
+  return restored;
+}
+
+// Click on the dimmed backdrop closes the panel
+const snapOverlayEl = document.getElementById('snapshotOverlay');
+if (snapOverlayEl) snapOverlayEl.addEventListener('click', (e) => {
+  if (e.target === snapOverlayEl) closeSnapshots();
+});
+
+// Live "Restore N selected" count as checkboxes change
+document.addEventListener('change', (e) => {
+  if (e.target.classList.contains('snap-check')) {
+    updatePickCount(e.target.closest('.snapshot-item'));
+  }
+});
 
 
 /* ----------------------------------------------------------------
@@ -1720,6 +2032,7 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
    ---------------------------------------------------------------- */
 async function init() {
   initThemeSwitcher();
+  updateSnapDot();
 
   // Reflect the stored takeover setting in the toggle
   const { takeoverNewTab = true } = await chrome.storage.local.get('takeoverNewTab');
