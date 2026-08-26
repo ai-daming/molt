@@ -1,0 +1,14 @@
+{
+  "moltName": {
+    "message": "Molt — 新标签页仪表盘"
+  },
+  "moltDescription": {
+    "message": "甩掉堆积的旧标签页。本地优先的新标签页仪表盘：搜索、静音、快照与恢复，全部数据只在你的电脑上。无账号、无追踪。"
+  },
+  "moltActionTitle": {
+    "message": "Molt — 打开仪表盘"
+  },
+  "cmdOpenDashboard": {
+    "message": "打开 Molt 仪表盘"
+  }
+}

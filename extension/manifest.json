@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Molt — New Tab Dashboard",
+  "default_locale": "en",
+  "name": "__MSG_moltName__",
   "version": "1.0.0",
-  "description": "Shed your old tabs. A local-first dashboard of all your open tabs — search, mute, snapshot & restore. No account, no tracking.",
+  "description": "__MSG_moltDescription__",
   "permissions": [
     "tabs",
     "activeTab",
@@ -15,7 +16,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Molt — open dashboard",
+    "default_title": "__MSG_moltActionTitle__",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png"
@@ -26,7 +27,7 @@
       "suggested_key": {
         "default": "Alt+T"
       },
-      "description": "Open the Molt dashboard"
+      "description": "__MSG_cmdOpenDashboard__"
     }
   },
   "icons": {

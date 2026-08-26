@@ -33,35 +33,35 @@
       <!-- Global tab search — filtering + keyboard shortcuts handled in app.js -->
       <input type="search" id="tabSearch" class="tab-search"
              placeholder="Search tabs  ( / )" autocomplete="off" spellcheck="false"
-             aria-label="Search open tabs">
+             data-i18n-placeholder="search.placeholder" data-i18n-aria="search.placeholder">
       <!-- Theme switcher — active state + persistence handled in app.js -->
-      <div class="theme-switcher" id="themeSwitcher" role="radiogroup" aria-label="Theme">
+      <div class="theme-switcher" id="themeSwitcher" role="radiogroup" aria-label="Theme" data-i18n-aria="theme.group">
         <button class="theme-btn" data-action="set-theme" data-theme-name="warm"
-                role="radio" aria-pressed="false" title="Warm paper">
+                role="radio" aria-pressed="false" title="Warm paper" data-i18n-title="theme.warm">
           <span class="theme-swatch theme-swatch-warm"></span>
         </button>
         <button class="theme-btn" data-action="set-theme" data-theme-name="midnight"
-                role="radio" aria-pressed="false" title="Midnight">
+                role="radio" aria-pressed="false" title="Midnight" data-i18n-title="theme.midnight">
           <span class="theme-swatch theme-swatch-midnight"></span>
         </button>
         <button class="theme-btn" data-action="set-theme" data-theme-name="arctic"
-                role="radio" aria-pressed="false" title="Arctic frost">
+                role="radio" aria-pressed="false" title="Arctic frost" data-i18n-title="theme.arctic">
           <span class="theme-swatch theme-swatch-arctic"></span>
         </button>
         <button class="theme-btn" data-action="set-theme" data-theme-name="forest"
-                role="radio" aria-pressed="false" title="Forest canopy">
+                role="radio" aria-pressed="false" title="Forest canopy" data-i18n-title="theme.forest">
           <span class="theme-swatch theme-swatch-forest"></span>
         </button>
       </div>
       <!-- Session snapshots (issue #1) — panel rendering in app.js -->
-      <button class="snapshots-btn" data-action="toggle-snapshots" title="Session snapshots">
+      <button class="snapshots-btn" data-action="toggle-snapshots" title="Session snapshots" data-i18n-title="snap.btnTitle">
         <span class="snap-dot" id="snapDot" hidden></span>
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
       </button>
       <!-- Settings (new tab takeover toggle) — handlers in app.js -->
-      <button class="settings-btn" data-action="toggle-settings" title="Settings" aria-haspopup="true" aria-expanded="false">
+      <button class="settings-btn" data-action="toggle-settings" title="Settings" data-i18n-title="settings.title" aria-haspopup="true" aria-expanded="false">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.23 1.408l-.998.982c-.28.276-.415.665-.398 1.058.006.09.006.18 0 .27-.017.394.119.782.398 1.058l.998.982c.392.385.472 1 .23 1.408l-1.296 2.247a1.125 1.125 0 0 1-1.37.49l-1.217-.456a1.125 1.125 0 0 0-1.075.124 5.53 5.53 0 0 1-.22.128 1.125 1.125 0 0 0-.645.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281a1.125 1.125 0 0 0-.645-.869 5.53 5.53 0 0 1-.22-.128 1.125 1.125 0 0 0-1.075-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .23-1.408l.998-.982c.28-.276.415-.665.398-1.058a4.53 4.53 0 0 1 0-.27c.017-.394-.119-.782-.398-1.058l-.998-.982a1.125 1.125 0 0 1-.23-1.408l1.296-2.247a1.125 1.125 0 0 1 1.37-.49l1.217.456c.355.133.751.072 1.075-.124.073-.044.146-.087.22-.127.332-.184.582-.496.645-.87l.213-1.281Z" />
           <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -69,10 +69,18 @@
       </button>
       <div class="settings-popover" id="settingsPopover" hidden>
         <label class="settings-row">
-          <span>Take over the new tab page</span>
+          <span data-i18n="settings.takeover">Take over the new tab page</span>
           <input type="checkbox" id="takeoverToggle" checked>
         </label>
-        <div class="settings-hint">Off: Cmd+T stays native; open the dashboard via the toolbar icon or Alt+T.</div>
+        <label class="settings-row">
+          <span data-i18n="settings.language">Language</span>
+          <select id="languageSelect">
+            <option value="auto" data-i18n="settings.langAuto">Auto (browser)</option>
+            <option value="en">English</option>
+            <option value="zh-CN">简体中文</option>
+          </select>
+        </label>
+        <div class="settings-hint" data-i18n="settings.hint">Off: Cmd+T stays native; open the dashboard via the toolbar icon or Alt+T.</div>
       </div>
     </div>
   </header>
@@ -88,11 +96,9 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
         </svg>
       </div>
-      <div class="tab-cleanup-text">
-        You have <strong id="tabOutDupeCount"></strong> Molt tabs open. Keep just this one?
-      </div>
+      <div class="tab-cleanup-text" id="tabOutDupeText"></div>
     </div>
-    <button class="tab-cleanup-btn" data-action="close-tabout-dupes">Close extras</button>
+    <button class="tab-cleanup-btn" data-action="close-tabout-dupes" data-i18n="banner.closeExtras">Close extras</button>
   </div>
 
   <!-- ================================================================
@@ -102,17 +108,17 @@
   <div class="quick-links" id="quickLinksSection">
     <div class="ql-head">
       <button class="ql-toggle" id="quickLinksToggle" data-action="toggle-quick-links"
-              aria-expanded="true" title="Collapse quick links">
+              aria-expanded="true" title="Collapse quick links" data-i18n-title="quick.toggle">
         <svg class="ql-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
       </button>
-      <h2 class="ql-title">Quick links</h2>
+      <h2 class="ql-title" data-i18n="quick.title">Quick links</h2>
       <div class="ql-chips" id="quickLinksChips"></div>
-      <button class="ql-add-btn" data-action="add-quick-link" title="Add shortcut">＋</button>
+      <button class="ql-add-btn" data-action="add-quick-link" title="Add shortcut" data-i18n-title="quick.add">＋</button>
     </div>
     <form class="ql-add-form" id="qlAddForm" hidden>
-      <input type="text" id="qlAddUrl" class="ql-input" placeholder="https://example.com"
+      <input type="text" id="qlAddUrl" class="ql-input" placeholder="https://example.com" data-i18n-placeholder="quick.urlPlaceholder"
              autocomplete="off" spellcheck="false" required>
-      <input type="text" id="qlAddTitle" class="ql-input" placeholder="Name (optional)"
+      <input type="text" id="qlAddTitle" class="ql-input" placeholder="Name (optional)" data-i18n-placeholder="quick.namePlaceholder"
              autocomplete="off" spellcheck="false">
       <button type="submit" class="action-btn">Add</button>
       <button type="button" class="action-btn ql-cancel" data-action="cancel-add-quick-link">Cancel</button>
@@ -130,7 +136,7 @@
     <!-- LEFT COLUMN: Open tabs -->
     <div class="active-section" id="openTabsSection" style="display:none">
       <div class="section-header">
-        <h2 id="openTabsSectionTitle">Right now</h2>
+        <h2 id="openTabsSectionTitle" data-i18n="section.openTabs">Right now</h2>
         <div class="section-line"></div>
         <div class="section-count" id="openTabsSectionCount"></div>
       </div>
@@ -140,7 +146,7 @@
     <!-- RIGHT COLUMN: Saved for Later checklist -->
     <div class="deferred-column" id="deferredColumn" style="display:none">
       <div class="section-header">
-        <h2>Saved for later</h2>
+        <h2 data-i18n="section.savedLater">Saved for later</h2>
         <div class="section-line"></div>
         <div class="section-count" id="deferredCount"></div>
       </div>
@@ -150,18 +156,18 @@
 
       <!-- Empty state — shown when no active deferred tabs -->
       <div class="deferred-empty" id="deferredEmpty" style="display:none">
-        Nothing saved. Living in the moment.
+        <span data-i18n="empty.deferred">Nothing saved. Living in the moment.</span>
       </div>
 
       <!-- Archive section — collapsed by default -->
       <div class="deferred-archive" id="deferredArchive" style="display:none">
         <button class="archive-toggle" id="archiveToggle">
           <svg class="archive-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-          Archive
+          <span data-i18n="archive.label">Archive</span>
           <span class="archive-count" id="archiveCount"></span>
         </button>
         <div class="archive-body" id="archiveBody" style="display:none">
-          <input type="text" class="archive-search" id="archiveSearch" placeholder="Search archived tabs...">
+          <input type="text" class="archive-search" id="archiveSearch" placeholder="Search archived tabs..." data-i18n-placeholder="archive.placeholder">
           <div class="archive-list" id="archiveList"></div>
         </div>
       </div>
@@ -176,7 +182,7 @@
     <div class="footer-stats">
       <div class="stat">
         <div class="stat-num" id="statTabs">—</div>
-        <div class="stat-label">Open tabs</div>
+        <div class="stat-label" data-i18n="footer.statLabel">Open tabs</div>
       </div>
     </div>
     <div class="last-refresh">
@@ -193,17 +199,17 @@
   <div class="snapshot-panel">
     <div class="snapshot-head">
       <div>
-        <div class="snapshot-title">Session snapshots</div>
-        <div class="snapshot-sub">Auto-saved as your tabs change &nbsp;·&nbsp; 100% local, nothing leaves your machine</div>
+        <div class="snapshot-title" data-i18n="snap.title">Session snapshots</div>
+        <div class="snapshot-sub" data-i18n="snap.subtitle">Auto-saved as your tabs change &nbsp;·&nbsp; 100% local, nothing leaves your machine</div>
       </div>
-      <button class="snapshot-close" data-action="close-snapshots" title="Close">
+      <button class="snapshot-close" data-action="close-snapshots" title="Close" data-i18n-title="snap.close">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
       </button>
     </div>
     <div class="snapshot-storage" id="snapshotStorage" hidden></div>
     <div id="snapshotGroups"></div>
     <div class="snapshot-retention">
-      Keeps every change today &nbsp;·&nbsp; snapshots for the last 48 h &nbsp;·&nbsp; one per day after that
+      <span data-i18n="snap.retention">Keeps every change today &nbsp;·&nbsp; snapshots for the last 48 h &nbsp;·&nbsp; one per day after that</span>
     </div>
   </div>
 </div>
@@ -220,9 +226,13 @@
   <span id="toastText"></span>
 </div>
 
+<!-- (Inline onerror attributes are blocked by the MV3 default CSP.) -->
+
+<!-- i18n dictionaries + t()/applyI18nStatic(), needed by app.js -->
+<script src="i18n.js"></script>
+
 <!-- Personal config (gitignored) — defines LOCAL_LANDING_PAGE_PATTERNS etc. -->
 <!-- If the file doesn't exist it just 404s; app.js falls back to defaults. -->
-<!-- (Inline onerror attributes are blocked by the MV3 default CSP.) -->
 <script src="config.local.js"></script>
 
 <!-- Main dashboard logic — loads last so the DOM is ready -->

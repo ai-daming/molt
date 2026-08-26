@@ -1,0 +1,18 @@
+{
+  "moltName": {
+    "message": "Molt — New Tab Dashboard",
+    "description": "Extension display name."
+  },
+  "moltDescription": {
+    "message": "Shed your old tabs. A local-first dashboard of all your open tabs — search, mute, snapshot & restore. No account, no tracking.",
+    "description": "Extension description, shown in the store and chrome://extensions."
+  },
+  "moltActionTitle": {
+    "message": "Molt — open dashboard",
+    "description": "Toolbar button tooltip."
+  },
+  "cmdOpenDashboard": {
+    "message": "Open the Molt dashboard",
+    "description": "Label of the Alt+T keyboard shortcut."
+  }
+}

@@ -526,13 +526,13 @@ function checkAndShowEmptyState() {
           <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
         </svg>
       </div>
-      <div class="empty-title">Inbox zero, but for tabs.</div>
-      <div class="empty-subtitle">You're free.</div>
+      <div class="empty-title">${escapeHtml(t('empty.checkmarkTitle'))}</div>
+      <div class="empty-subtitle">${escapeHtml(t('empty.checkmarkSub'))}</div>
     </div>
   `;
 
   const countEl = document.getElementById('openTabsSectionCount');
-  if (countEl) countEl.textContent = '0 domains';
+  if (countEl) countEl.textContent = t('empty.zeroDomains');
 }
 
 /**
@@ -549,11 +549,11 @@ function timeAgo(dateStr) {
   const diffHours = Math.floor((now - then) / 3600000);
   const diffDays  = Math.floor((now - then) / 86400000);
 
-  if (diffMins < 1)   return 'just now';
-  if (diffMins < 60)  return diffMins + ' min ago';
-  if (diffHours < 24) return diffHours + ' hr' + (diffHours !== 1 ? 's' : '') + ' ago';
-  if (diffDays === 1) return 'yesterday';
-  return diffDays + ' days ago';
+  if (diffMins < 1)   return t('time.justNow');
+  if (diffMins < 60)  return t('time.minAgo', { n: diffMins });
+  if (diffHours < 24) return tCount('time.hrAgo', diffHours);
+  if (diffDays === 1) return t('time.yesterday');
+  return t('time.daysAgo', { n: diffDays });
 }
 
 /**
@@ -561,16 +561,16 @@ function timeAgo(dateStr) {
  */
 function getGreeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return t('greeting.morning');
+  if (hour < 17) return t('greeting.afternoon');
+  return t('greeting.evening');
 }
 
 /**
  * getDateDisplay() — "Friday, April 4, 2026"
  */
 function getDateDisplay() {
-  return new Date().toLocaleDateString('en-US', {
+  return new Date().toLocaleDateString(I18N.locale === 'zh-CN' ? 'zh-CN' : 'en-US', {
     weekday: 'long',
     year:    'numeric',
     month:   'long',
@@ -836,12 +836,13 @@ function getRealTabs() {
  */
 function checkTabOutDupes() {
   const tabOutTabs = openTabs.filter(t => t.isTabOut);
-  const banner  = document.getElementById('tabOutDupeBanner');
-  const countEl = document.getElementById('tabOutDupeCount');
+  const banner = document.getElementById('tabOutDupeBanner');
+  const textEl = document.getElementById('tabOutDupeText');
   if (!banner) return;
 
   if (tabOutTabs.length > 1) {
-    if (countEl) countEl.textContent = tabOutTabs.length;
+    // Dictionary value carries the <strong> markup itself (dictionary-only)
+    if (textEl) textEl.innerHTML = I18N.tCount('banner.dupesOpen', tabOutTabs.length);
     banner.style.display = 'flex';
   } else {
     banner.style.display = 'none';
@@ -866,20 +867,20 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
     const faviconUrl = tab.url ? localFaviconUrl(tab.url) : '';
     const mutedNow   = !!tab.muted;
     const audioTag   = (tab.audible || mutedNow)
-      ? `<button class="chip-audio${mutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${mutedNow ? 'Muted — click to unmute' : 'Playing audio — click to mute'}">${mutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
+      ? `<button class="chip-audio${mutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${mutedNow ? t('chip.audioMutedTitle') : t('chip.audioOnTitle')}" >${mutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
       : '';
     const lockedNow  = lockedUrls.has(tab.url);
     return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" tabindex="0" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
       <div class="chip-actions">
-        <button class="chip-action chip-lock${lockedNow ? ' is-locked' : ''}" data-action="toggle-lock-tab" data-tab-url="${safeUrl}" title="${lockedNow ? 'Locked — click to unlock' : 'Lock this tab'}">
+        <button class="chip-action chip-lock${lockedNow ? ' is-locked' : ''}" data-action="toggle-lock-tab" data-tab-url="${safeUrl}" title="${lockedNow ? t('chip.lockedTitle') : t('chip.lockTitle')}">
           ${lockedNow ? ICONS.lock : ICONS.lockOpen}
         </button>
-        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
+        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="${t('chip.save')}">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>
-        <button class="chip-action chip-close" data-action="close-single-tab" data-tab-url="${safeUrl}" title="Close this tab">
+        <button class="chip-action chip-close" data-action="close-single-tab" data-tab-url="${safeUrl}" title="${t('chip.close')}">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -889,7 +890,7 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
   return `
     <div class="page-chips-overflow" style="display:none">${hiddenChips}</div>
     <div class="page-chip page-chip-overflow clickable" data-action="expand-chips">
-      <span class="chip-text">+${hiddenTabs.length} more</span>
+      <span class="chip-text">${escapeHtml(t('tabs.more', { n: hiddenTabs.length }))}</span>
     </div>`;
 }
 
@@ -919,12 +920,12 @@ function renderDomainCard(group) {
 
   const tabBadge = `<span class="open-tabs-badge">
     ${ICONS.tabs}
-    ${tabCount} tab${tabCount !== 1 ? 's' : ''} open
+    ${escapeHtml(tCount('tabs.openBadge', tabCount))}
   </span>`;
 
   const dupeBadge = hasDupes
     ? `<span class="open-tabs-badge" style="color:var(--accent-amber);background:rgba(200,113,58,0.08);">
-        ${totalExtras} duplicate${totalExtras !== 1 ? 's' : ''}
+        ${escapeHtml(tCount('tabs.dupeBadge', totalExtras))}
       </span>`
     : '';
 
@@ -961,7 +962,7 @@ function renderDomainCard(group) {
     // It's a button — click to mute/unmute without leaving the dashboard.
     const isMutedNow = !!mutedByUrl[tab.url];
     const audioTag   = (tab.audible || isMutedNow)
-      ? `<button class="chip-audio${isMutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${isMutedNow ? 'Muted — click to unmute' : 'Playing audio — click to mute'}">${isMutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
+      ? `<button class="chip-audio${isMutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${isMutedNow ? t('chip.audioMutedTitle') : t('chip.audioOnTitle')}" >${isMutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
       : '';
     const lockedNow  = lockedUrls.has(tab.url);
     let domain = '';
@@ -971,13 +972,13 @@ function renderDomainCard(group) {
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${audioTag}
       <div class="chip-actions">
-        <button class="chip-action chip-lock${lockedNow ? ' is-locked' : ''}" data-action="toggle-lock-tab" data-tab-url="${safeUrl}" title="${lockedNow ? 'Locked — click to unlock' : 'Lock this tab'}">
+        <button class="chip-action chip-lock${lockedNow ? ' is-locked' : ''}" data-action="toggle-lock-tab" data-tab-url="${safeUrl}" title="${lockedNow ? t('chip.lockedTitle') : t('chip.lockTitle')}">
           ${lockedNow ? ICONS.lock : ICONS.lockOpen}
         </button>
-        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
+        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="${t('chip.save')}">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>
-        <button class="chip-action chip-close" data-action="close-single-tab" data-tab-url="${safeUrl}" title="Close this tab">
+        <button class="chip-action chip-close" data-action="close-single-tab" data-tab-url="${safeUrl}" title="${t('chip.close')}">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -987,14 +988,14 @@ function renderDomainCard(group) {
   let actionsHtml = `
     <button class="action-btn close-tabs" data-action="close-domain-tabs" data-domain-id="${stableId}">
       ${ICONS.close}
-      Close all ${tabCount} tab${tabCount !== 1 ? 's' : ''}
+      ${escapeHtml(tCount('tabs.closeAll', tabCount))}
     </button>`;
 
   if (hasDupes) {
     const dupeUrlsEncoded = dupeUrls.map(([url]) => encodeURIComponent(url)).join(',');
     actionsHtml += `
       <button class="action-btn" data-action="dedup-keep-one" data-dupe-urls="${dupeUrlsEncoded}">
-        Close ${totalExtras} duplicate${totalExtras !== 1 ? 's' : ''}
+        ${escapeHtml(tCount('tabs.closeDupes', totalExtras))}
       </button>`;
   }
 
@@ -1003,7 +1004,7 @@ function renderDomainCard(group) {
       <div class="status-bar"></div>
       <div class="mission-content">
         <div class="mission-top">
-          <span class="mission-name">${isLanding ? 'Homepages' : (group.label || friendlyDomain(group.domain))}</span>
+          <span class="mission-name">${escapeHtml(isLanding ? t('group.homepages') : (group.label || friendlyDomain(group.domain)))}</span>
           ${tabBadge}
           ${dupeBadge}
         </div>
@@ -1012,7 +1013,7 @@ function renderDomainCard(group) {
       </div>
       <div class="mission-meta">
         <div class="mission-page-count">${tabCount}</div>
-        <div class="mission-page-label">tabs</div>
+        <div class="mission-page-label">${escapeHtml(t('tabs.pageLabel'))}</div>
       </div>
     </div>`;
 }
@@ -1053,7 +1054,7 @@ async function renderDeferredColumn() {
 
     // Render active checklist items
     if (active.length > 0) {
-      countEl.textContent = `${active.length} item${active.length !== 1 ? 's' : ''}`;
+      countEl.textContent = tCount('deferred.items', active.length);
       list.innerHTML = active.map(item => renderDeferredItem(item)).join('');
       list.style.display = 'block';
       empty.style.display = 'none';
@@ -1105,7 +1106,7 @@ function renderDeferredItem(item) {
           <span>${escapeHtml(ago)}</span>
         </div>
       </div>
-      <button class="deferred-dismiss" data-action="dismiss-deferred" data-deferred-id="${safeId}" title="Dismiss">
+      <button class="deferred-dismiss" data-action="dismiss-deferred" data-deferred-id="${safeId}" title="${t('deferred.dismiss')}">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
       </button>
     </div>`;
@@ -1303,25 +1304,28 @@ async function renderStaticDashboard() {
   const openTabsSectionTitle = document.getElementById('openTabsSectionTitle');
 
   if (domainGroups.length > 0 && openTabsSection) {
-    if (openTabsSectionTitle) openTabsSectionTitle.textContent = 'Open tabs';
+    if (openTabsSectionTitle) openTabsSectionTitle.textContent = t('section.openTabs');
     if (searchQuery) {
-      // While filtering, don't offer "Close all" — it closes hidden tabs too
-      openTabsSectionCount.innerHTML = `<b>${visibleTabsCount}</b> match${visibleTabsCount !== 1 ? 'es' : ''} for &ldquo;${escapeHtml(searchQuery)}&rdquo; in ${domainGroups.length} site${domainGroups.length !== 1 ? 's' : ''}`;
+      // While filtering, hide the bulk-close button — it would take hidden tabs with it
+      openTabsSectionCount.innerHTML = tCount('search.matches', visibleTabsCount, {
+        q: `\u201C${escapeHtml(searchQuery)}\u201D`,
+        sites: tCount('search.sites', domainGroups.length),
+      });
     } else {
       const playingCount = realTabs.filter(t => t.audible).length;
       const playingBtn = playingCount > 0
-        ? ` &nbsp;&middot;&nbsp; <button class="action-btn" data-action="mute-all-playing" style="font-size:11px;padding:3px 10px;color:var(--accent-amber);">${ICONS.audioOn} Mute ${playingCount} playing</button>`
+        ? ` &nbsp;&middot;&nbsp; <button class="action-btn" data-action="mute-all-playing" style="font-size:11px;padding:3px 10px;color:var(--accent-amber);">${ICONS.audioOn} ${escapeHtml(tCount('tabs.mutePlaying', playingCount))}</button>`
         : '';
-      openTabsSectionCount.innerHTML = `${domainGroups.length} domain${domainGroups.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp; <button class="action-btn close-tabs" data-action="close-all-open-tabs" style="font-size:11px;padding:3px 10px;">${ICONS.close} Close all ${realTabs.length} tabs</button>${playingBtn}`;
+      openTabsSectionCount.innerHTML = `${tCount('tabs.domainsLine', domainGroups.length)} &nbsp;&middot;&nbsp; <button class="action-btn close-tabs" data-action="close-all-open-tabs" style="font-size:11px;padding:3px 10px;">${ICONS.close} ${escapeHtml(tCount('tabs.closeAll', realTabs.length))}</button>${playingBtn}`;
     }
     openTabsMissionsEl.innerHTML = domainGroups.map(g => renderDomainCard(g)).join('');
     openTabsSection.style.display = 'block';
   } else if (openTabsSection) {
     if (searchQuery) {
       // Keep the section visible with an empty state instead of hiding it mid-search
-      if (openTabsSectionTitle) openTabsSectionTitle.textContent = 'Open tabs';
-      openTabsSectionCount.innerHTML = `No matches for &ldquo;${escapeHtml(searchQuery)}&rdquo;`;
-      openTabsMissionsEl.innerHTML = '<div class="search-empty">Nothing found — try a shorter query, or press Esc to clear.</div>';
+      if (openTabsSectionTitle) openTabsSectionTitle.textContent = t('section.openTabs');
+      openTabsSectionCount.innerHTML = t('search.noMatches', { q: `\u201C${escapeHtml(searchQuery)}\u201D` });
+      openTabsMissionsEl.innerHTML = `<div class="search-empty">${escapeHtml(t('search.emptyHint'))}</div>`;
       openTabsSection.style.display = 'block';
     } else {
       openTabsSection.style.display = 'none';
@@ -1389,8 +1393,8 @@ document.addEventListener('click', async (e) => {
         const anyUnmuted = targets.some(t => !(t.mutedInfo && t.mutedInfo.muted));
         for (const t of targets) await chrome.tabs.update(t.id, { muted: anyUnmuted });
         showToast(anyUnmuted
-          ? `Muted ${targets.length} tab${targets.length !== 1 ? 's' : ''}`
-          : `Unmuted ${targets.length} tab${targets.length !== 1 ? 's' : ''}`);
+          ? tCount('toast.muted', targets.length)
+          : tCount('toast.unmuted', targets.length));
         renderDashboard();
       }
     }
@@ -1402,7 +1406,7 @@ document.addEventListener('click', async (e) => {
     const playing = await chrome.tabs.query({ audible: true });
     if (playing.length === 0) return;
     for (const t of playing) await chrome.tabs.update(t.id, { muted: true });
-    showToast(`Muted ${playing.length} playing tab${playing.length !== 1 ? 's' : ''}`);
+    showToast(tCount('toast.mutedPlaying', playing.length));
     renderDashboard();
     return;
   }
@@ -1437,7 +1441,7 @@ document.addEventListener('click', async (e) => {
     if (!id) return;
     await setQuickLinks((await getQuickLinks()).filter(l => l.id !== id));
     await renderQuickLinks();
-    showToast('Shortcut removed');
+    showToast(t('quick.removed'));
     return;
   }
 
@@ -1450,11 +1454,11 @@ document.addEventListener('click', async (e) => {
     if (lockedUrls.has(url)) {
       lockedUrls.delete(url);
       await chrome.storage.local.set({ lockedTabs: [...lockedUrls] });
-      showToast('Tab unlocked');
+      showToast(t('lock.unlockedToast'));
     } else {
       lockedUrls.add(url);
       await chrome.storage.local.set({ lockedTabs: [...lockedUrls] });
-      showToast('Tab locked — bulk close will skip it');
+      showToast(t('lock.lockedToast'));
     }
     renderDashboard();
     return;
@@ -1504,10 +1508,10 @@ document.addEventListener('click', async (e) => {
       if (urls.length === 0) return;
     }
     actionEl.disabled = true;
-    actionEl.textContent = 'Restoring…';
+    actionEl.textContent = t('snap.restoring');
     const n = await restoreSnapshot(snap, urls);
     closeSnapshots();
-    showToast(`Restored ${n} tab${n !== 1 ? 's' : ''} from ${fmtSnapTime(snap.id)}`);
+    showToast(tCount('toast.restored', n, { when: fmtSnapTime(snap.id) }));
     renderDashboard();
     return;
   }
@@ -1522,7 +1526,7 @@ document.addEventListener('click', async (e) => {
       banner.style.opacity = '0';
       setTimeout(() => { banner.style.display = 'none'; banner.style.opacity = '1'; }, 400);
     }
-    showToast('Closed extra Molt tabs');
+    showToast(t('toast.taboutClosed'));
     return;
   }
 
@@ -1556,7 +1560,7 @@ document.addEventListener('click', async (e) => {
     // unlock instead of silently obeying.
     await loadLockedTabs();
     if (lockedUrls.has(tabUrl)) {
-      showToast('This tab is locked — click the open lock to unlock first');
+      showToast(t('lock.singleBlocked'));
       return;
     }
 
@@ -1594,7 +1598,7 @@ document.addEventListener('click', async (e) => {
     const statTabs = document.getElementById('statTabs');
     if (statTabs) statTabs.textContent = openTabs.length;
 
-    showToast('Tab closed');
+    showToast(t('toast.tabClosed'));
     return;
   }
 
@@ -1610,7 +1614,7 @@ document.addEventListener('click', async (e) => {
       await saveTabForLater({ url: tabUrl, title: tabTitle });
     } catch (err) {
       console.error('[tab-out] Failed to save tab:', err);
-      showToast('Failed to save tab');
+      showToast(t('toast.saveFailed'));
       return;
     }
 
@@ -1629,7 +1633,7 @@ document.addEventListener('click', async (e) => {
       setTimeout(() => chip.remove(), 200);
     }
 
-    showToast('Saved for later');
+    showToast(t('toast.savedLater'));
     await renderDeferredColumn();
     return;
   }
@@ -1674,7 +1678,7 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  // ---- Close all tabs in a domain group ----
+  // ---- Bulk-close every tab of one domain group ----
   if (action === 'close-domain-tabs') {
     const domainId = actionEl.dataset.domainId;
     const group    = domainGroups.find(g => {
@@ -1698,10 +1702,10 @@ document.addEventListener('click', async (e) => {
       animateCardOut(card);
     }
 
-    const groupLabel = group.domain === '__landing-pages__' ? 'Homepages' : (group.label || friendlyDomain(group.domain));
+    const groupLabel = group.domain === '__landing-pages__' ? t('group.homepages') : (group.label || friendlyDomain(group.domain));
     showToast(skipped > 0
-      ? `Closed ${closed} from ${groupLabel} — kept ${skipped} locked`
-      : `Closed ${urls.length} tab${urls.length !== 1 ? 's' : ''} from ${groupLabel}`);
+      ? t('lock.closedKept', { closed, label: groupLabel, skipped })
+      : tCount('toast.domainClosed', urls.length, { label: groupLabel }));
 
     const statTabs = document.getElementById('statTabs');
     if (statTabs) statTabs.textContent = openTabs.length;
@@ -1724,7 +1728,7 @@ document.addEventListener('click', async (e) => {
     if (skipped > 0) {
       // Locked copies survived — redraw so badges match what's still open.
       await renderDashboard();
-      showToast(`Closed ${closed} duplicate${closed !== 1 ? 's' : ''} — kept ${skipped} locked`);
+      showToast(t('lock.dedupeKept', { closed, skipped }));
       return;
     }
 
@@ -1748,7 +1752,7 @@ document.addEventListener('click', async (e) => {
       card.classList.add('has-neutral-bar');
     }
 
-    showToast('Closed duplicates, kept one copy each');
+    showToast(t('toast.dedupeDone'));
     return;
   }
 
@@ -1784,8 +1788,8 @@ document.addEventListener('click', async (e) => {
     }
 
     showToast(skipped > 0
-      ? `Closed ${closed} tab${closed !== 1 ? 's' : ''} — kept ${skipped} locked`
-      : 'All tabs closed. Fresh start.');
+      ? t('lock.allFreshKept', { closed, skipped })
+      : t('toast.freshStart'));
     return;
   }
 });
@@ -1826,7 +1830,7 @@ document.addEventListener('input', async (e) => {
     );
 
     archiveList.innerHTML = results.map(item => renderArchiveItem(item)).join('')
-      || '<div style="font-size:12px;color:var(--muted);padding:8px 0">No results</div>';
+      || `<div style="font-size:12px;color:var(--muted);padding:8px 0">${escapeHtml(t('archive.noResults'))}</div>`;
   } catch (err) {
     console.warn('[tab-out] Archive search failed:', err);
   }
@@ -2124,7 +2128,7 @@ document.addEventListener('submit', async (e) => {
   const titleInput = document.getElementById('qlAddTitle');
   const url = normalizeQuickLinkUrl(urlInput.value);
   if (!url) {
-    showToast('Enter a valid web address');
+    showToast(t('quick.invalidUrl'));
     urlInput.focus();
     return;
   }
@@ -2146,7 +2150,7 @@ document.addEventListener('submit', async (e) => {
   e.target.reset();
   e.target.hidden = true;
   await renderQuickLinks();
-  showToast(existing ? 'Shortcut updated' : 'Shortcut added');
+  showToast(existing ? t('quick.updated') : t('quick.added'));
 });
 
 /* ---- Quick-links drag & drop reorder (HTML5 dnd, delegated) ---- */
@@ -2236,8 +2240,8 @@ function localDayKey(date) {
 }
 
 function dayLabel(key) {
-  if (key === localDayKey(new Date())) return 'Today';
-  if (key === localDayKey(new Date(Date.now() - 86_400_000))) return 'Yesterday';
+  if (key === localDayKey(new Date())) return t('day.today');
+  if (key === localDayKey(new Date(Date.now() - 86_400_000))) return t('day.yesterday');
   const [y, m, d] = key.split('-');
   return new Date(+y, +m - 1, +d, 12).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
@@ -2248,9 +2252,9 @@ function fmtSnapTime(iso) {
 
 function relTime(iso) {
   const ms = Date.now() - +new Date(iso);
-  if (ms < 60_000) return 'just now';
-  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
-  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
+  if (ms < 60_000) return t('time.justNow');
+  if (ms < 3_600_000) return t('time.minRel', { n: Math.floor(ms / 60_000) });
+  if (ms < 86_400_000) return t('time.hrRel', { n: Math.floor(ms / 3_600_000) });
   return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
@@ -2310,15 +2314,15 @@ async function renderSnapshotPanel() {
   if (storageEl) {
     try {
       const bytes = await chrome.storage.local.getBytesInUse(SNAP_KEY);
-      storageEl.textContent = `${snaps.length} snapshot${snaps.length !== 1 ? 's' : ''} kept · ~${fmtBytes(bytes)}`;
+      storageEl.textContent = tCount('snap.keptStorage', snaps.length, { kept: tCount('snap.kept', snaps.length), size: fmtBytes(bytes) });
     } catch {
-      storageEl.textContent = `${snaps.length} snapshot${snaps.length !== 1 ? 's' : ''} kept`;
+      storageEl.textContent = tCount('snap.kept', snaps.length);
     }
     storageEl.hidden = false;
   }
 
   if (snaps.length === 0) {
-    groupsEl.innerHTML = '<div class="search-empty">Nothing here yet — snapshots are taken automatically as your tabs change.</div>';
+    groupsEl.innerHTML = `<div class="search-empty">${escapeHtml(t('snap.empty'))}</div>`;
     return;
   }
 
@@ -2356,13 +2360,16 @@ function renderSnapshotItem(s) {
       <div class="snapshot-date">${escapeHtml(relTime(s.id))}</div>
     </div>
     <div class="snapshot-what">
-      <div class="snapshot-meta"><b>${s.tabs.length} tab${s.tabs.length !== 1 ? 's' : ''}</b> · ${s.windows} window${s.windows !== 1 ? 's' : ''} · ${domains.length} site${domains.length !== 1 ? 's' : ''}</div>
+      <div class="snapshot-meta">${tCount('snap.meta', s.tabs.length, {
+        windows: tCount('snap.windows', s.windows),
+        sites:   tCount('search.sites', domains.length),
+      })}</div>
       <div class="snapshot-domains">${avatars}${more}</div>
       ${picker}
     </div>
     <div class="snapshot-actions">
-      <button class="snap-btn" data-action="snapshot-pick-toggle" data-snap-id="${idAttr}">${expandedSnapId === s.id ? 'Hide picker' : 'Pick tabs…'}</button>
-      <button class="snap-btn primary" data-action="snapshot-restore-all" data-snap-id="${idAttr}">Restore all</button>
+      <button class="snap-btn" data-action="snapshot-pick-toggle" data-snap-id="${idAttr}">${expandedSnapId === s.id ? t('snap.hidePicker') : t('snap.pickTabs')}</button>
+      <button class="snap-btn primary" data-action="snapshot-restore-all" data-snap-id="${idAttr}">${escapeHtml(t('snap.restoreAll'))}</button>
     </div>
   </div>`;
 }
@@ -2370,7 +2377,7 @@ function renderSnapshotItem(s) {
 function renderSnapshotPicker(s) {
   const byDomain = new Map();
   for (const t of s.tabs) {
-    const d = domainOf(t.url) || '(other)';
+    const d = domainOf(t.url) || t('snap.otherDomain');
     if (!byDomain.has(d)) byDomain.set(d, []);
     byDomain.get(d).push(t);
   }
@@ -2381,10 +2388,10 @@ function renderSnapshotPicker(s) {
       <div class="picker-domain">
         ${avatarHtml(d)}
         <span>${escapeHtml(d)}</span>
-        <button class="pick-all" data-action="snapshot-domain-all" data-snap-id="${escapeHtml(s.id)}" data-domain="${escapeHtml(d)}">select all</button>
+        <button class="pick-all" data-action="snapshot-domain-all" data-snap-id="${escapeHtml(s.id)}" data-domain="${escapeHtml(d)}">${escapeHtml(t('snap.select'))}</button>
       </div>`;
     rows += tabs.map(t => `
-      <label class="picker-row" data-domain="${escapeHtml(domainOf(t.url) || '(other)')}">
+      <label class="picker-row" data-domain="${escapeHtml(domainOf(t.url) || t('snap.otherDomain'))}">
         <input type="checkbox" class="snap-check" data-url="${escapeHtml(t.url)}">
         <span class="p-title" title="${escapeHtml(t.title || t.url)}">${escapeHtml(t.title || t.url)}</span>
         <span class="p-url">${escapeHtml(t.url)}</span>
@@ -2395,8 +2402,8 @@ function renderSnapshotPicker(s) {
   <div class="snapshot-picker">
     ${rows}
     <div class="picker-foot">
-      <button class="snap-btn" data-action="snapshot-cancel-pick" data-snap-id="${escapeHtml(s.id)}">Cancel</button>
-      <button class="snap-btn primary snap-restore-sel" data-action="snapshot-restore-sel" data-snap-id="${escapeHtml(s.id)}" disabled>Restore 0 selected</button>
+      <button class="snap-btn" data-action="snapshot-cancel-pick" data-snap-id="${escapeHtml(s.id)}">${escapeHtml(t('snap.cancel'))}</button>
+      <button class="snap-btn primary snap-restore-sel" data-action="snapshot-restore-sel" data-snap-id="${escapeHtml(s.id)}" disabled>${escapeHtml(tCount('snap.restoreSel', 0))}</button>
     </div>
   </div>`;
 }
@@ -2406,7 +2413,7 @@ function updatePickCount(item) {
   const n = item.querySelectorAll('.snap-check:checked').length;
   const btn = item.querySelector('.snap-restore-sel');
   if (btn) {
-    btn.textContent = `Restore ${n} selected`;
+    btn.textContent = tCount('snap.restoreSel', n);
     btn.disabled = n === 0;
   }
 }
@@ -2482,9 +2489,7 @@ document.addEventListener('change', async (e) => {
   if (e.target.id !== 'takeoverToggle') return;
   const takeover = e.target.checked;
   await chrome.storage.local.set({ takeoverNewTab: takeover });
-  showToast(takeover
-    ? 'New tab takeover on — takes effect on your next new tab'
-    : 'New tab takeover off — dashboard now opens via icon or Alt+T');
+  showToast(takeover ? t('takeover.onToast') : t('takeover.offToast'));
 });
 
 // Close the settings popover when clicking anywhere outside it
@@ -2537,7 +2542,30 @@ setInterval(async () => {
 /* ----------------------------------------------------------------
    INITIALIZE
    ---------------------------------------------------------------- */
+async function applyLanguage() {
+  applyI18nStatic();
+  await renderDashboard();          // includes quick links + dupe banner
+  const ov = document.getElementById('snapshotOverlay');
+  if (ov?.classList.contains('open')) await renderSnapshotPanel();
+}
+
+// Language selector in the settings popover (issue #9)
+document.addEventListener('change', async (e) => {
+  if (e.target.id !== 'languageSelect') return;
+  await I18N.setLanguage(e.target.value);
+  showToast(I18N.locale === 'zh-CN' ? '界面语言已切换' : 'Language switched');
+  await applyLanguage();
+});
+
 async function init() {
+  await I18N.init();
+  applyI18nStatic();
+  try {
+    const { uiLanguage = 'auto' } = await chrome.storage.local.get('uiLanguage');
+    const sel = document.getElementById('languageSelect');
+    if (sel) sel.value = uiLanguage;
+  } catch {}
+
   initThemeSwitcher();
   updateSnapDot();
   renderQuickLinks();
@@ -2556,7 +2584,7 @@ async function init() {
     if (container) container.remove();
     const hint = document.createElement('div');
     hint.className = 'minimal-hint';
-    hint.textContent = 'Molt is not taking over new tabs — open the dashboard via the toolbar icon or Alt+T';
+    hint.textContent = t('minimal.hint');
     document.body.appendChild(hint);
     return;
   }

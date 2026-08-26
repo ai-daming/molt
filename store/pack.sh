@@ -32,11 +32,17 @@ fi
 TMP=$(mktemp -d)
 unzip -q "$ZIP" -d "$TMP"
 
-# 1. git 同步检查：包内 app.js 必须与工作区完全一致（防止忘记重打包）
+# 1. git 同步检查：包内核心文件必须与工作区完全一致（防止忘记重打包）
 if ! diff -q "$EXT/app.js" "$TMP/app.js" > /dev/null; then
   fail "包内 app.js 与 extension/app.js 不一致——包是旧的，重新运行 ./store/pack.sh"
 fi
-pass "包内 app.js 与工作区一致"
+for f in background.js index.html style.css i18n.js manifest.json \
+         _locales/en/messages.json _locales/zh_CN/messages.json; do
+  [ -f "$EXT/$f" ] || fail "extension/$f 不存在"
+  [ -f "$TMP/$f" ] || fail "包里缺少 $f——重新运行 ./store/pack.sh"
+  diff -q "$EXT/$f" "$TMP/$f" > /dev/null || fail "包内 $f 与工作区不一致——包是旧的"
+done
+pass "包内文件与工作区一致（app/i18n/background/index/styles/manifest/_locales）"
 
 # 2. 音频字段映射存在（fetchOpenTabs 曾剥离 audible/muted 导致标记永远不亮）
 unzip -p "$ZIP" app.js 2>/dev/null | grep -q "audible:" || TMP_MISSING=1
@@ -57,16 +63,27 @@ pass "字体已本地化（8 woff2），零 CDN 外链"
 grep -rq "s2/favicons" "$TMP" && fail "存在 s2/favicons 外联残留"
 pass "favicon 零外联（chrome://favicon2）"
 
-# 6. manifest：名称、版本、描述 ≤132、双入口要素
-python3 - "$TMP/manifest.json" <<'EOF' || fail "manifest 校验未通过"
-import json, sys
-m = json.load(open(sys.argv[1]))
-assert m['name'].startswith('Molt'), f"name={m['name']}"
-assert len(m['description']) <= 132, f"description {len(m['description'])} > 132"
-assert 'commands' in m and 'open-dashboard' in m['commands'], '缺少 Alt+T command'
+# 6. manifest：本地化名称、版本、描述 ≤132、双入口要素
+python3 - "$TMP/manifest.json" "$TMP/_locales" <<'EOF' || fail "manifest 校验未通过"
+import json, sys, os
+mpath, ldir = sys.argv[1], sys.argv[2]
+m = json.load(open(mpath))
+assert m.get('default_locale') == 'en', f"default_locale={m.get('default_locale')}"
+assert m['name'] == '__MSG_moltName__', f"name={m['name']}"
+assert m['description'] == '__MSG_moltDescription__'
+def msgs(loc):
+    return json.load(open(os.path.join(ldir, loc, 'messages.json')))
+en, zh = msgs('en'), msgs('zh_CN')
+need = {'moltName', 'moltDescription', 'moltActionTitle', 'cmdOpenDashboard'}
+assert need <= set(en), f'en 缺 key: {sorted(need - set(en))}'
+assert need <= set(zh), f'zh_CN 缺 key: {sorted(need - set(zh))}'
+assert en['moltName']['message'].startswith('Molt'), "英文名必须以 Molt 开头"
+for label, loc in (('en', en), ('zh_CN', zh)):
+    d = loc['moltDescription']['message']
+    assert len(d) <= 132, f"{label} description {len(d)} > 132"
 assert m['permissions'] == ['tabs', 'activeTab', 'storage'], f"权限变了: {m['permissions']}"
 EOF
-pass "manifest：Molt / v$VERSION / 描述≤132 / Alt+T / 权限最小集"
+pass "manifest：双语 _locales / v$VERSION / 描述≤132 / Alt+T / 权限最小集"
 
 # 7. 隐私排除项：私有配置与杂文件不得混入
 [ ! -e "$TMP/config.local.js" ] || fail "config.local.js 混入了发布包！"
