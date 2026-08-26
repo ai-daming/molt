@@ -19,7 +19,7 @@
 
 ## Phase 1 — MVP（目标：2 周内，上架前完成）
 
-- [ ] **真机回归**：加载 unpacked 扩展，覆盖上游 issue #33（Chrome 147 报错）、#12（新标签页加载慢）两个场景，记录基线
+- [x] **真机回归**：用户 2026-08-26 全量真机验证通过（Chrome 147 报错未复现，加载速度正常，快照/接管/主题/音频全部确认）
 - [ ] **性能**：渲染防抖 + 首屏优化（参考 soarpenguin fork 的 refresh debounce 思路）
 - [ ] **favicon 本地化**（issue #4）：切断对 google.com/s2/favicons 的外联，改用 `tab.favIconUrl` + `chrome://favicon2` 兜底——README 宣称"无外部调用"目前不属实，必须修
 - [x] **全局搜索**：`/` 聚焦（标题/URL 实时过滤、120ms 防抖）、Esc 清空、Enter 跳转首个结果；搜索时隐藏"Close all"防误关（2026-08-22）
