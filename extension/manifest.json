@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Molt",
+  "name": "Molt — New Tab Dashboard",
   "version": "1.0.0",
   "description": "Shed your old tabs. A local-first dashboard of all your open tabs — search, mute, snapshot & restore. No account, no tracking.",
   "permissions": [

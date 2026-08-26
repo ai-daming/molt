@@ -61,7 +61,7 @@ pass "favicon 零外联（chrome://favicon2）"
 python3 - "$TMP/manifest.json" <<'EOF' || fail "manifest 校验未通过"
 import json, sys
 m = json.load(open(sys.argv[1]))
-assert m['name'] == 'Molt', f"name={m['name']}"
+assert m['name'].startswith('Molt'), f"name={m['name']}"
 assert len(m['description']) <= 132, f"description {len(m['description'])} > 132"
 assert 'commands' in m and 'open-dashboard' in m['commands'], '缺少 Alt+T command'
 assert m['permissions'] == ['tabs', 'activeTab', 'storage'], f"权限变了: {m['permissions']}"

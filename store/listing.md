@@ -7,10 +7,8 @@
 
 ## 一、列表信息（英文主版本）
 
-**Name**（≤45 字符）：
-```
-Molt — New Tab Dashboard
-```
+**Name**：**在 manifest.json 里设置，商店回显，列表页不可单独编辑**（已设为
+`Molt — New Tab Dashboard`）。控制台里 Name 显示为灰字是正常的。
 
 **Summary**（≤132 字符）：
 ```
