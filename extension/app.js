@@ -54,6 +54,8 @@ async function fetchOpenTabs() {
       title:    t.title,
       windowId: t.windowId,
       active:   t.active,
+      audible:  !!t.audible,
+      muted:    !!(t.mutedInfo && t.mutedInfo.muted),
       // Flag Tab Out's own pages so we can detect duplicate new tabs
       isTabOut: t.url === newtabUrl || BROWSER_NEWTAB_URLS.includes(t.url),
     }));
@@ -817,7 +819,7 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = tab.url ? localFaviconUrl(tab.url) : '';
-    const mutedNow   = !!(tab.mutedInfo && tab.mutedInfo.muted);
+    const mutedNow   = !!tab.muted;
     const audioTag   = (tab.audible || mutedNow)
       ? `<button class="chip-audio${mutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${safeUrl}" title="${mutedNow ? 'Muted — click to unmute' : 'Playing audio — click to mute'}">${mutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`
       : '';
@@ -888,7 +890,7 @@ function renderDomainCard(group) {
   // (chips are deduped by URL, but any instance may be the one making noise)
   const mutedByUrl   = {};
   for (const t of tabs) {
-    if (t.mutedInfo && t.mutedInfo.muted) mutedByUrl[t.url] = true;
+    if (t.muted) mutedByUrl[t.url] = true;
   }
 
   const visibleTabs = uniqueTabs.slice(0, 8);
@@ -2029,13 +2031,38 @@ document.addEventListener('click', (e) => {
 
 
 // Keep speaker indicators live: audio starts/stops on background tabs
-// without the user touching anything, so re-render (debounced) on change.
+// without the user touching anything. Some Chrome builds don't surface
+// audible transitions through onUpdated changeInfo, so we also poll a
+// cheap audible/muted signature and re-render only when it changes.
 let audioRefreshTimer = null;
-chrome.tabs.onUpdated.addListener((tabId, info) => {
-  if (!('audible' in info) && !('mutedInfo' in info)) return;
+let audioSignature   = '';
+function scheduleAudioRefresh() {
   clearTimeout(audioRefreshTimer);
   audioRefreshTimer = setTimeout(() => renderDashboard(), 300);
+}
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  if (!('audible' in info) && !('mutedInfo' in info)) return;
+  scheduleAudioRefresh();
 });
+
+setInterval(async () => {
+  // Don't yank the page out from under an in-progress interaction
+  const active   = document.activeElement;
+  const typing   = active && (active.id === 'tabSearch' || active.tagName === 'TEXTAREA' || active.tagName === 'INPUT');
+  const panelOpen = document.getElementById('snapshotOverlay')?.classList.contains('open');
+  if (typing || panelOpen) return;
+  try {
+    const tabs = await chrome.tabs.query({});
+    const sig  = tabs.map(t => (t.audible ? 'A' : '-') + (t.mutedInfo?.muted ? 'M' : '-')).join('');
+    if (sig !== audioSignature) {
+      const hadAudio = audioSignature.includes('A');
+      audioSignature = sig;
+      // Skip the very first run's guaranteed-mismatch full redraw unless
+      // any audio state exists either way (cheap anyway, but be tidy)
+      if (hadAudio || sig.includes('A')) renderDashboard();
+    }
+  } catch {}
+}, 4000);
 
 
 /* ----------------------------------------------------------------
