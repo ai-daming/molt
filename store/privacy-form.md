@@ -34,11 +34,11 @@ session snapshots in chrome.storage.local — entirely on the device.
 
 ## 3. 数据使用披露（Data usage）
 
-全部勾选 **"I do not collect or use this information"**，包括但不限于：
-- Website content / Personal communications / Health / Financial …（整列全部 No）
-- **Authentication info**：No（无账号体系）
-- **Personal communications**：No
-- **Location / Web history / User activity**：No（不读取浏览历史，仅当前打开的标签）
+界面是复选框语义：**勾选 = 声明收集，留空 = 声明不收集**。
+九项（PII / Health / Financial / Authentication / Personal communications /
+Location / Web history / User activity / Website content）**全部保持不勾**。
+下方三条 "I certify" 认证**全部勾选**（必须全勾才能提交，对我们均为事实）。
+判断标准：数据是否离开用户设备——Molt 零上传，故全空。
 
 ## 4. 远程代码声明
 
