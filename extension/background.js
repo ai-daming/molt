@@ -120,8 +120,10 @@ function isRealWebTab(t) {
 
 // Content signature: identical consecutive states are not stored twice.
 // windowId is deliberately excluded — it changes every browser restart.
+// groupId IS included (issue #5 groundwork): moving a tab in/out of a
+// native Chrome group is a real state change worth snapshotting.
 function snapSignature(tabs) {
-  return tabs.map(t => `${t.pinned ? 'p' : '-'}|${t.url}`).sort().join('\n');
+  return tabs.map(t => `${t.pinned ? 'p' : '-'}|${t.url}|${t.groupId ?? -1}`).sort().join('\n');
 }
 
 async function captureSnapshot() {
@@ -132,6 +134,9 @@ async function captureSnapshot() {
       .map(t => ({
         url: t.url, title: t.title || '', pinned: !!t.pinned,
         windowId: t.windowId, index: t.index,
+        // Native Chrome tab-group membership (issue #5). Just "tabs"
+        // permission exposes it on the Tab object; -1 = no group.
+        groupId: typeof t.groupId === 'number' ? t.groupId : -1,
       }))
       .sort((a, b) => a.index - b.index);
     if (real.length === 0) return;
