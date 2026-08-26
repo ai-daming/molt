@@ -16,7 +16,8 @@ Shed your old tabs. A local-first dashboard of everything you have open — sear
 ```
 （126 字符 ✓）
 
-**Category**：Productivity
+**Category**：分组下拉（组标题不可选）→ **PRODUCTIVITY → Tools**
+（标签管理类的标准归类；Language 选 English，zh-CN 本地化上架后再加）
 
 **Language**：English（可另加 zh-CN 本地化，见下）
 
