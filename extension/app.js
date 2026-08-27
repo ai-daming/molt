@@ -112,6 +112,7 @@ async function fetchOpenTabs() {
       active:   t.active,
       audible:  !!t.audible,
       muted:    !!(t.mutedInfo && t.mutedInfo.muted),
+      lastAccessed: typeof t.lastAccessed === 'number' ? t.lastAccessed : 0,
       groupId:  typeof t.groupId === 'number' ? t.groupId : -1,
       // Flag Tab Out's own pages so we can detect duplicate new tabs
       isTabOut: t.url === newtabUrl || BROWSER_NEWTAB_URLS.includes(t.url),
@@ -1088,6 +1089,9 @@ function renderDomainCard(group) {
  * "Saved for Later" checklist column. Shows active items as a checklist
  * and completed items in a collapsible archive.
  */
+// URLs currently sitting in the Saved-for-later list (preview meta uses it)
+let deferredUrlSet = new Set();
+
 async function renderDeferredColumn() {
   const column         = document.getElementById('deferredColumn');
   const list           = document.getElementById('deferredList');
@@ -1101,6 +1105,7 @@ async function renderDeferredColumn() {
 
   try {
     const { active, archived } = await getSavedTabs();
+    deferredUrlSet = new Set(active.map(item => item.url));
 
     // Hide the entire column if there's nothing to show
     if (active.length === 0 && archived.length === 0) {
@@ -2021,12 +2026,12 @@ function ensureChipPreviewEl() {
     el.className = 'chip-preview';
     el.setAttribute('role', 'tooltip');
     el.innerHTML = `
-      <div class="chip-preview-head">
+      <div class="chip-preview-title">
         <img class="chip-preview-favicon" alt="">
-        <span class="chip-preview-domain"></span>
+        <span class="chip-preview-title-text"></span>
       </div>
-      <div class="chip-preview-title"></div>
-      <div class="chip-preview-url"></div>`;
+      <div class="chip-preview-url"></div>
+      <div class="chip-preview-meta"></div>`;
     document.body.appendChild(el);
   }
   return el;
@@ -2048,20 +2053,34 @@ function showChipPreview(chip, { instant = false } = {}) {
     // A dashboard re-render may have replaced this chip mid-wait
     if (!chip.isConnected) return;
 
-    const el      = ensureChipPreviewEl();
-    const url     = chip.dataset.tabUrl || '';
+    const el  = ensureChipPreviewEl();
+    const url = chip.dataset.tabUrl || '';
     // Label lives in data-tab-title (title attr would double up with the
     // browser's native tooltip)
-    const title   = chip.dataset.tabTitle || url;
-    let hostname  = '';
-    try { hostname = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+    const title = chip.dataset.tabTitle || url;
 
-    el.querySelector('.chip-preview-title').textContent  = title;
-    el.querySelector('.chip-preview-url').textContent    = url;
-    el.querySelector('.chip-preview-domain').textContent = hostname;
+    el.querySelector('.chip-preview-title-text').textContent = title;
+    el.querySelector('.chip-preview-url').textContent        = url;
     const fav = el.querySelector('.chip-preview-favicon');
-    fav.style.display = '';
+    fav.style.display = url ? '' : 'none';
     fav.src = url ? localFaviconUrl(url) : '';
+
+    // --- the increment: state you can't see on the chip itself ---
+    const instances = openTabs.filter(x => x.url === url);
+    const playing = instances.some(x => x.audible);
+    const muted   = instances.some(x => x.muted);
+    const lastActive = instances.reduce((m, x) => Math.max(m, x.lastAccessed || 0), 0);
+
+    const meta = [];
+    if (instances.length > 1) meta.push(tCount('preview.dupes', instances.length));
+    if (playing)      meta.push(t('preview.playing'));
+    else if (muted)   meta.push(t('preview.muted'));
+    if (lockedUrls.has(url))     meta.push(t('preview.locked'));
+    if (deferredUrlSet.has(url)) meta.push(t('preview.saved'));
+    if (lastActive) meta.push(t('preview.lastActive', { when: relTime(new Date(lastActive).toISOString()) }));
+    const metaEl = el.querySelector('.chip-preview-meta');
+    metaEl.textContent = meta.join('  ·  ');
+    metaEl.hidden = meta.length === 0;
 
     // Measure off-screen, position clamped to the viewport, then fade in
     el.classList.remove('visible');

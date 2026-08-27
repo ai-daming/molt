@@ -122,6 +122,14 @@ const I18N = (() => {
       'day.today':     'Today',
       'day.yesterday': 'Yesterday',
 
+      // Hover preview increment (issue #6)
+      'preview.dupes':      { one: '{n} copy of this URL is open', other: '{n} copies of this URL are open' },
+      'preview.playing':    'Playing audio',
+      'preview.muted':      'Muted',
+      'preview.locked':     'Locked — bulk close skips it',
+      'preview.saved':      'In Saved for later',
+      'preview.lastActive': 'Active {when}',
+
       // Snapshots panel
       'snap.title':           'Session snapshots',
       'snap.subtitle':        'Auto-saved as your tabs change  ·  100% local, nothing leaves your machine',
@@ -252,6 +260,14 @@ const I18N = (() => {
       'time.hrRel':    '{n} 小时前',
       'day.today':     '今天',
       'day.yesterday': '昨天',
+
+      // 悬停预览增量信息（issue #6）
+      'preview.dupes':      '这个网址开着 {n} 个标签页',
+      'preview.playing':    '正在播放声音',
+      'preview.muted':      '已静音',
+      'preview.locked':     '已锁定，批量关闭会跳过',
+      'preview.saved':      '已在稍后读清单',
+      'preview.lastActive': '{when}活跃',
 
       'snap.title':           '会话快照',
       'snap.subtitle':        '随标签页变化自动保存 · 全部本地存储，数据不出你的电脑',
