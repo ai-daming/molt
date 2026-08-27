@@ -1038,6 +1038,7 @@ header {
 /* ---- Actions row ---- */
 .actions {
   display: flex;
+  flex-wrap: wrap;      /* tight cards: whole buttons flow to the next line */
   gap: 8px;
   margin-top: 10px;
 }
@@ -1056,6 +1057,16 @@ header {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  /* Never break INSIDE a button (zh labels wrapped mid-phrase in narrow
+     cards); the row wraps between buttons instead, and the label itself
+     ellipsizes only when a single button can't fit at all. */
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.action-btn .btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .action-btn:hover {
@@ -1066,6 +1077,7 @@ header {
 .action-btn svg {
   width: 12px;
   height: 12px;
+  flex-shrink: 0;
 }
 
 .action-btn.primary {

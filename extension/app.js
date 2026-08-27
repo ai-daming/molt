@@ -1042,18 +1042,18 @@ function renderDomainCard(group) {
     <button class="action-btn" data-action="create-tab-group" data-domain-id="${stableId}"
             title="${escapeHtml(t('group.createTitle'))}">
       ${ICONS.group}
-      ${escapeHtml(t('group.create'))}
+      <span class="btn-label">${escapeHtml(t('group.create'))}</span>
     </button>
     <button class="action-btn close-tabs" data-action="close-domain-tabs" data-domain-id="${stableId}">
       ${ICONS.close}
-      ${escapeHtml(tCount('tabs.closeAll', tabCount))}
+      <span class="btn-label">${escapeHtml(tCount('tabs.closeAll', tabCount))}</span>
     </button>`;
 
   if (hasDupes) {
     const dupeUrlsEncoded = dupeUrls.map(([url]) => encodeURIComponent(url)).join(',');
     actionsHtml += `
       <button class="action-btn" data-action="dedup-keep-one" data-dupe-urls="${dupeUrlsEncoded}">
-        ${escapeHtml(tCount('tabs.closeDupes', totalExtras))}
+        <span class="btn-label">${escapeHtml(tCount('tabs.closeDupes', totalExtras))}</span>
       </button>`;
   }
 
