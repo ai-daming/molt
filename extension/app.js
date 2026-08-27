@@ -133,7 +133,7 @@ function groupBadgeHtml(tab) {
   if (!g) return '';
   const color = GROUP_COLOR_HEX[g.color] || GROUP_COLOR_HEX.grey;
   const name = g.title ? escapeHtml(g.title) : '';
-  return `<span class="chip-group-badge" title="${name}"><span class="chip-group-dot" style="background:${color}"></span><span class="chip-group-name">${name}</span></span>`;
+  return `<span class="chip-group-badge" aria-label="${name}"><span class="chip-group-dot" style="background:${color}"></span><span class="chip-group-name">${name}</span></span>`;
 }
 
 /**
@@ -921,7 +921,7 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
       : '';
     const lockedNow  = lockedUrls.has(tab.url);
     const grpTag     = groupBadgeHtml(tab);
-    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" tabindex="0" data-tab-url="${safeUrl}" title="${safeTitle}">
+    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" tabindex="0" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" aria-label="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${grpTag}${audioTag}
       <div class="chip-actions">
@@ -1020,7 +1020,7 @@ function renderDomainCard(group) {
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = tab.url ? localFaviconUrl(tab.url) : '';
-    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" tabindex="0" data-tab-url="${safeUrl}" title="${safeTitle}">
+    return `<div class="page-chip clickable${chipClass}${lockedNow ? ' chip-locked' : ''}" data-action="focus-tab" tabindex="0" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" aria-label="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${grpTag}${audioTag}
       <div class="chip-actions">
@@ -2050,8 +2050,9 @@ function showChipPreview(chip, { instant = false } = {}) {
 
     const el      = ensureChipPreviewEl();
     const url     = chip.dataset.tabUrl || '';
-    // The chip's title attribute carries the clean full label already
-    const title   = chip.getAttribute('title') || url;
+    // Label lives in data-tab-title (title attr would double up with the
+    // browser's native tooltip)
+    const title   = chip.dataset.tabTitle || url;
     let hostname  = '';
     try { hostname = new URL(url).hostname.replace(/^www\./, ''); } catch {}
 
@@ -2067,8 +2068,8 @@ function showChipPreview(chip, { instant = false } = {}) {
     const rect = chip.getBoundingClientRect();
     const w = el.offsetWidth, h = el.offsetHeight;
     let x = Math.min(rect.left, window.innerWidth  - w - 8);
-    let y = rect.top  - h - 8;                       // prefer above the chip
-    if (y < 8) y = rect.bottom + 8;
+    let y = rect.bottom + 8;                         // prefer below the chip
+    if (y + h > window.innerHeight - 8) y = rect.top - h - 8;
     x = Math.max(8, Math.min(x, window.innerWidth  - w - 8));
     y = Math.max(8, Math.min(y, window.innerHeight - h - 8));
     el.style.left = `${Math.round(x)}px`;
@@ -2082,10 +2083,16 @@ function showChipPreview(chip, { instant = false } = {}) {
   else previewTimer = setTimeout(paint, PREVIEW_DELAY_MS);
 }
 
-// Mouse: hover the chip (or anything inside it, incl. action buttons)
+// Mouse: hover the chip body shows the preview; hovering the chip's
+// action buttons (lock/save/close/audio) is intent on that button, so
+// the preview steps aside instead of covering the click target
 document.addEventListener('mouseover', (e) => {
   const chip = e.target.closest?.('.page-chip[data-action="focus-tab"]');
   if (!chip) return;
+  if (e.target.closest?.('.chip-actions, .chip-audio, .chip-group-badge')) {
+    hideChipPreview();
+    return;
+  }
   if (previewChipEl === chip) return; // already handled / painting
   showChipPreview(chip);
 });
