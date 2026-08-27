@@ -124,6 +124,43 @@ async function fetchOpenTabs() {
 }
 
 /**
+ * refreshChipStateForUrl(url, { audibleNow, mutedNow })
+ *
+ * Syncs the lock + audio buttons on every chip representing this URL
+ * in place. Toggling a per-chip flag never justifies re-rendering the
+ * whole grid — that replays every card's entrance animation and reads
+ * as a full-page flash.
+ */
+function refreshChipStateForUrl(url, { audibleNow, mutedNow } = {}) {
+  const locked = lockedUrls.has(url);
+  const showAudio = audibleNow === true || mutedNow === true;
+  document.querySelectorAll('.page-chip[data-action="focus-tab"]').forEach(chip => {
+    if (chip.dataset.tabUrl !== url) return;
+
+    chip.classList.toggle('chip-locked', locked);
+    const lockBtn = chip.querySelector('.chip-lock');
+    if (lockBtn) {
+      lockBtn.classList.toggle('is-locked', locked);
+      lockBtn.title = locked ? t('chip.lockedTitle') : t('chip.lockTitle');
+      lockBtn.innerHTML = locked ? ICONS.lock : ICONS.lockOpen;
+    }
+
+    const audioBtn = chip.querySelector('.chip-audio');
+    if (!showAudio) {
+      audioBtn?.remove();
+    } else if (audioBtn) {
+      audioBtn.classList.toggle('is-muted', !!mutedNow);
+      audioBtn.title = mutedNow ? t('chip.audioMutedTitle') : t('chip.audioOnTitle');
+      audioBtn.innerHTML = mutedNow ? ICONS.audioOff : ICONS.audioOn;
+    } else {
+      const actions = chip.querySelector('.chip-actions');
+      if (actions) actions.insertAdjacentHTML('beforebegin',
+        `<button class="chip-audio${mutedNow ? ' is-muted' : ''}" data-action="toggle-mute-tab" data-tab-url="${escapeHtml(url)}" title="${mutedNow ? t('chip.audioMutedTitle') : t('chip.audioOnTitle')}">${mutedNow ? ICONS.audioOff : ICONS.audioOn}</button>`);
+    }
+  });
+}
+
+/**
  * groupBadgeHtml(tab)
  *
  * Colored-dot + name pill for chips that belong to a native Chrome
@@ -1455,10 +1492,15 @@ document.addEventListener('click', async (e) => {
       if (targets.length > 0) {
         const anyUnmuted = targets.some(t => !(t.mutedInfo && t.mutedInfo.muted));
         for (const t of targets) await chrome.tabs.update(t.id, { muted: anyUnmuted });
+        await fetchOpenTabs(); // refresh openTabs audio flags, no re-render
+        const now = openTabs.filter(t => t.url === url);
+        refreshChipStateForUrl(url, {
+          audibleNow: now.some(t => t.audible),
+          mutedNow:   now.some(t => t.muted),
+        });
         showToast(anyUnmuted
           ? tCount('toast.muted', targets.length)
           : tCount('toast.unmuted', targets.length));
-        renderDashboard();
       }
     }
     return;
@@ -1469,8 +1511,12 @@ document.addEventListener('click', async (e) => {
     const playing = await chrome.tabs.query({ audible: true });
     if (playing.length === 0) return;
     for (const t of playing) await chrome.tabs.update(t.id, { muted: true });
+    await fetchOpenTabs();
+    const touchedUrls = new Set(playing.map(t => t.url));
+    for (const url of touchedUrls) {
+      refreshChipStateForUrl(url, { audibleNow: false, mutedNow: true });
+    }
     showToast(tCount('toast.mutedPlaying', playing.length));
-    renderDashboard();
     return;
   }
 
@@ -1567,7 +1613,12 @@ document.addEventListener('click', async (e) => {
       await chrome.storage.local.set({ lockedTabs: [...lockedUrls] });
       showToast(t('lock.lockedToast'));
     }
-    renderDashboard();
+    refreshChipStateForUrl(url);
+    // The open preview carries a locked-flag in its meta line — repaint
+    // it if it's showing for exactly this chip
+    if (previewChipEl?.dataset.tabUrl === url) {
+      showChipPreview(previewChipEl, { instant: true });
+    }
     return;
   }
 
