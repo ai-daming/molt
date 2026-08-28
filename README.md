@@ -45,7 +45,7 @@ You'll see Molt.
 
 ## Features
 
-- **See all your tabs at a glance** — clean grid grouped by domain, homepages (Gmail, X, YouTube, GitHub…) pulled into their own card
+- **See all your tabs at a glance** — clean grid grouped by domain
 - **Global search** — press `/` anywhere on the page, filter by title or URL, `Enter` jumps to the first match
 - **Find the noisy tab** — amber speaker markers appear on chips while a tab plays audio; click one to mute, or silence everything at once
 - **Session snapshots** — auto-saved as your tabs change; restore all or pick individual tabs, with window grouping and pinned state preserved

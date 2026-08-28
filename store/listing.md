@@ -34,7 +34,7 @@ Closing is reversible. Session snapshots are taken automatically as your tabs ch
 No external requests, no analytics, no servers. Everything lives in your browser's local storage. Delete the extension and every trace is gone.
 
 WHY MOLT
-• See everything — open tabs grouped by domain, homepages (Gmail, X, YouTube, GitHub…) in their own card
+• See everything — open tabs grouped by domain
 • Find anything — press / to search titles and URLs, Enter jumps to the first match
 • Silence anything — amber speaker badges mark tabs that are playing audio; mute one or all in a click
 • Close with confidence — duplicate detection, one-click dedupe, and session snapshots that make every close reversible
@@ -73,7 +73,7 @@ Molt 把新标签页变成所有打开标签的指挥台：按域名分组，一
 零外部请求、无统计、无服务器，一切都在浏览器本地。删除扩展，痕迹清零。
 
 WHY MOLT
-• 全局一览 —— 打开标签按域名分组，Gmail/X/YouTube/GitHub 首页独立成卡
+• 全局一览 —— 打开标签按域名分组，各站各卡
 • 按任意键即搜 —— 按 / 搜索标题与网址，回车直达第一个结果
 • 一键静音 —— 琥珀色扬声器标记正在出声的标签，单个或全部一键静音
 • 放心关 —— 重复检测、一键去重，会话快照让每次关闭都可逆

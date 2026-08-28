@@ -167,8 +167,7 @@ const I18N = (() => {
       'theme.forest':   'Forest canopy',
       'theme.group':    'Theme',
 
-      // Landing group label + misc
-      'group.homepages':     'Homepages',
+      // Tab groups (issue #5)
       'group.create':        'Create tab group',
       'group.createTitle':   "Put this site's tabs into a native Chrome tab group",
       'group.created':       { one: 'Grouped {n} tab', other: 'Grouped {n} tabs' },
@@ -303,7 +302,6 @@ const I18N = (() => {
       'theme.forest':   '松林',
       'theme.group':    '主题',
 
-      'group.homepages':     '首页',
       'group.create':        '转为标签组',
       'group.createTitle':   '把这个站点的标签页在 Chrome 标签条上编为一个原生标签组',
       'group.created':       '已将 {n} 个标签页编入标签组',

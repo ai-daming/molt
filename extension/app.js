@@ -7,7 +7,7 @@
 
    What this file does:
    1. Reads open browser tabs directly via chrome.tabs.query()
-   2. Groups tabs by domain with a landing pages category
+   2. Groups tabs by domain (landing pages included, no special-casing)
    3. Renders domain cards, banners, and stats
    4. Handles all user actions (close tabs, save for later, focus tab)
    5. Stores "Saved for Later" tabs in chrome.storage.local (no server)
@@ -179,11 +179,11 @@ function groupBadgeHtml(tab) {
  *
  * Closes open tabs that exactly match one of the given URLs.
  *
- * Previously this matched by hostname, which would also close tabs the
- * user never saw — e.g. closing a domain card would take down the
- * corresponding homepage tab that had been split into the Homepages
- * group. Exact-URL matching keeps the action scoped to what the card
- * actually shows and still closes every duplicate tab for each URL.
+ * Exact-URL matching keeps the action scoped to what the card actually
+ * shows and still closes every duplicate tab for each URL. (Issue #11:
+ * landing pages are no longer split into a separate Homepages group, so
+ * a domain's close-all closes its start page too — by design; lock what
+ * you keep.)
  *
  * Locked URLs (issue #8) are always skipped, and the caller gets back
  * how many tabs were closed vs. locked so toasts can say so.
@@ -997,7 +997,6 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
 function renderDomainCard(group) {
   const tabs      = group.tabs || [];
   const tabCount  = tabs.length;
-  const isLanding = group.domain === '__landing-pages__';
   const stableId  = 'domain-' + group.domain.replace(/[^a-z0-9]/g, '-');
 
   // Count duplicates (exact URL match)
@@ -1075,7 +1074,7 @@ function renderDomainCard(group) {
     </div>`;
   }).join('') + (extraCount > 0 ? buildOverflowChips(uniqueTabs.slice(8), urlCounts) : '');
 
-  const groupTitle = isLanding ? t('group.homepages') : (group.label || friendlyDomain(group.domain));
+  const groupTitle = group.label || friendlyDomain(group.domain);
   let actionsHtml = `
     <button class="action-btn" data-action="create-tab-group" data-domain-id="${stableId}"
             title="${escapeHtml(t('group.createTitle'))}">
@@ -1100,7 +1099,7 @@ function renderDomainCard(group) {
       <div class="status-bar"></div>
       <div class="mission-content">
         <div class="mission-top">
-          <span class="mission-name">${escapeHtml(isLanding ? t('group.homepages') : (group.label || friendlyDomain(group.domain)))}</span>
+          <span class="mission-name">${escapeHtml(group.label || friendlyDomain(group.domain))}</span>
           ${tabBadge}
           ${dupeBadge}
         </div>
@@ -1241,7 +1240,7 @@ function renderArchiveItem(item) {
  * The main render function:
  * 1. Paints greeting + date
  * 2. Fetches open tabs via chrome.tabs.query()
- * 3. Groups tabs by domain (with landing pages pulled out to their own group)
+ * 3. Groups tabs by domain
  * 4. Renders domain cards
  * 5. Updates footer stats
  * 6. Renders the "Saved for Later" checklist
@@ -1273,41 +1272,11 @@ async function renderStaticDashboard() {
   const realTabs = getRealTabs();
 
   // --- Group tabs by domain ---
-  // Landing pages (Gmail inbox, Twitter home, etc.) get their own special group
-  // so they can be closed together without affecting content tabs on the same domain.
-  const LANDING_PAGE_PATTERNS = [
-    { hostname: 'mail.google.com', test: (p, h) =>
-        !h.includes('#inbox/') && !h.includes('#sent/') && !h.includes('#search/') },
-    { hostname: 'x.com',               pathExact: ['/home'] },
-    { hostname: 'www.linkedin.com',    pathExact: ['/'] },
-    { hostname: 'github.com',          pathExact: ['/'] },
-    { hostname: 'www.youtube.com',     pathExact: ['/'] },
-    // Merge personal patterns from config.local.js (if it exists)
-    ...(typeof LOCAL_LANDING_PAGE_PATTERNS !== 'undefined' ? LOCAL_LANDING_PAGE_PATTERNS : []),
-  ];
-
-  function isLandingPage(url) {
-    try {
-      const parsed = new URL(url);
-      return LANDING_PAGE_PATTERNS.some(p => {
-        // Support both exact hostname and suffix matching (for wildcard subdomains)
-        const hostnameMatch = p.hostname
-          ? parsed.hostname === p.hostname
-          : p.hostnameEndsWith
-            ? parsed.hostname.endsWith(p.hostnameEndsWith)
-            : false;
-        if (!hostnameMatch) return false;
-        if (p.test)       return p.test(parsed.pathname, url);
-        if (p.pathPrefix) return parsed.pathname.startsWith(p.pathPrefix);
-        if (p.pathExact)  return p.pathExact.includes(parsed.pathname);
-        return parsed.pathname === '/';
-      });
-    } catch { return false; }
-  }
-
+  // Everything sits in its domain card — landing/start pages included
+  // (issue #11). Tabs you keep open permanently are the lock feature's
+  // (#8) job, not a special bucket's.
   domainGroups = [];
-  const groupMap    = {};
-  const landingTabs = [];
+  const groupMap = {};
 
   // Custom group rules from config.local.js (if any)
   const customGroups = typeof LOCAL_CUSTOM_GROUPS !== 'undefined' ? LOCAL_CUSTOM_GROUPS : [];
@@ -1331,11 +1300,6 @@ async function renderStaticDashboard() {
 
   for (const tab of realTabs) {
     try {
-      if (isLandingPage(tab.url)) {
-        landingTabs.push(tab);
-        continue;
-      }
-
       // Check custom group rules first (e.g. merge subdomains, split by path)
       const customRule = matchCustomGroup(tab.url);
       if (customRule) {
@@ -1360,29 +1324,8 @@ async function renderStaticDashboard() {
     }
   }
 
-  if (landingTabs.length > 0) {
-    groupMap['__landing-pages__'] = { domain: '__landing-pages__', tabs: landingTabs };
-  }
-
-  // Sort: landing pages first, then domains from landing page sites, then by tab count
-  // Collect exact hostnames and suffix patterns for priority sorting
-  const landingHostnames = new Set(LANDING_PAGE_PATTERNS.map(p => p.hostname).filter(Boolean));
-  const landingSuffixes = LANDING_PAGE_PATTERNS.map(p => p.hostnameEndsWith).filter(Boolean);
-  function isLandingDomain(domain) {
-    if (landingHostnames.has(domain)) return true;
-    return landingSuffixes.some(s => domain.endsWith(s));
-  }
-  domainGroups = Object.values(groupMap).sort((a, b) => {
-    const aIsLanding = a.domain === '__landing-pages__';
-    const bIsLanding = b.domain === '__landing-pages__';
-    if (aIsLanding !== bIsLanding) return aIsLanding ? -1 : 1;
-
-    const aIsPriority = isLandingDomain(a.domain);
-    const bIsPriority = isLandingDomain(b.domain);
-    if (aIsPriority !== bIsPriority) return aIsPriority ? -1 : 1;
-
-    return b.tabs.length - a.tabs.length;
-  });
+  // Sort by tab count — the busiest site deserves the top slot
+  domainGroups = Object.values(groupMap).sort((a, b) => b.tabs.length - a.tabs.length);
 
   // --- Global search filter (data-level, before render) ---
   let visibleTabsCount = realTabs.length;
@@ -1565,9 +1508,7 @@ document.addEventListener('click', async (e) => {
     const liveTabs = (await chrome.tabs.query({})).filter(t => urlSet.has(t.url));
     if (liveTabs.length === 0) return;
 
-    const title = grp.domain === '__landing-pages__'
-      ? t('group.homepages')
-      : (grp.label || friendlyDomain(grp.domain));
+    const title = grp.label || friendlyDomain(grp.domain);
     const color = GROUP_COLOR_NAMES[stringHash(grp.domain || title) % GROUP_COLOR_NAMES.length];
 
     // tabs.group() requires all tabs to share a window; domain cards can
@@ -1860,7 +1801,7 @@ document.addEventListener('click', async (e) => {
       animateCardOut(card);
     }
 
-    const groupLabel = group.domain === '__landing-pages__' ? t('group.homepages') : (group.label || friendlyDomain(group.domain));
+    const groupLabel = group.label || friendlyDomain(group.domain);
     showToast(skipped > 0
       ? t('lock.closedKept', { closed, label: groupLabel, skipped })
       : tCount('toast.domainClosed', urls.length, { label: groupLabel }));
