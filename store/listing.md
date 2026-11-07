@@ -1,7 +1,7 @@
-# Chrome Web Store 上架材料 — Molt 1.0.0
+# Chrome Web Store 上架材料 — Molt 1.0.1
 
-> 使用方法：开发者控制台（https://chrome.google.com/webstore/devconsole）→ 新 item →
-> 上传 `dist/molt-1.0.0.zip` → 下列文案逐栏粘贴 → 截图按 shot-list.md 拍摄上传 → 提交审核。
+> 使用方法：开发者控制台（https://chrome.google.com/webstore/devconsole）→ 既有 item →
+> 上传 `dist/molt-1.0.1.zip`（新 package）→ 更新说明可粘贴下述发版备注 → 提交审核。
 
 ---
 
@@ -92,3 +92,12 @@ Molt 是 Zara Zhang 的 Tab Out（MIT）的活跃维护分支，包含社区安�
 - 截图：5 张，1280×800 PNG（必须是真实界面，禁止过度加工）
 - 小图标（store icon）：用 `extension/icons/icon128.png` 已符合 128×128
 - 商店横幅（可选）：440×280，可后续补
+
+---
+
+## 四、发版备注（Release notes，随新 package 提交时粘贴）
+
+**v1.0.1**
+
+- EN: Fixed a flicker: the first column of the tab grid no longer blinks when a background tab's audio starts or stops. Speaker and tab-group badges now update in place.
+- zh-CN: 修复闪烁问题：后台标签页的音频开始或停止时，标签页网格的第一列不再闪烁。喇叭图标与标签组徽章改为原位更新。
