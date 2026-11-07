@@ -161,6 +161,126 @@ function refreshChipStateForUrl(url, { audibleNow, mutedNow } = {}) {
 }
 
 /**
+ * renderOpenTabsSummary()
+ *
+ * Repaints the section header line (domain count · close-all · mute-N-
+ * playing, or the search match count while filtering). Safe to call
+ * repeatedly: the header carries no entrance animation, so repainting
+ * it never reads as a flash.
+ */
+function renderOpenTabsSummary() {
+  const openTabsSectionCount = document.getElementById('openTabsSectionCount');
+  if (!openTabsSectionCount) return;
+  if (searchQuery) {
+    // While filtering, hide the bulk-close button — it would take hidden tabs with it
+    const visibleTabsCount = domainGroups.reduce((s, g) => s + g.tabs.length, 0);
+    openTabsSectionCount.innerHTML = tCount('search.matches', visibleTabsCount, {
+      q: `\u201C${escapeHtml(searchQuery)}\u201D`,
+      sites: tCount('search.sites', domainGroups.length),
+    });
+  } else {
+    const realTabs = getRealTabs();
+    const playingCount = realTabs.filter(t => t.audible).length;
+    const playingBtn = playingCount > 0
+      ? ` &nbsp;&middot;&nbsp; <button class="action-btn" data-action="mute-all-playing" style="font-size:11px;padding:3px 10px;color:var(--accent-amber);">${ICONS.audioOn} ${escapeHtml(tCount('tabs.mutePlaying', playingCount))}</button>`
+      : '';
+    openTabsSectionCount.innerHTML = `${tCount('tabs.domainsLine', domainGroups.length)} &nbsp;&middot;&nbsp; <button class="action-btn close-tabs" data-action="close-all-open-tabs" style="font-size:11px;padding:3px 10px;">${ICONS.close} ${escapeHtml(tCount('tabs.closeAll', realTabs.length))}</button>${playingBtn}`;
+  }
+}
+
+/**
+ * syncAudioChipStates()
+ *
+ * In-place reconciliation of speaker/mute state after an audio flip.
+ * Chrome toggles tab.audible on quiet passages of playing audio, which
+ * used to trigger a full renderDashboard() — swapping every card's
+ * innerHTML and replaying the entrance stagger (the "first column
+ * keeps flashing" bug: only cards 1–4 carry fadeUp, and in the
+ * columnated .missions layout those are exactly the first column).
+ *
+ * Audio state is aggregated per URL (any instance audible/muted wins),
+ * then only chips whose state actually changed are touched. If a chip's
+ * URL has disappeared — a tab closed since the last render — that's a
+ * structural change the chip can't represent, so fall back to one full
+ * render (rare, and always user-initiated).
+ */
+async function syncAudioChipStates() {
+  if (searchQuery) return; // filtered view; chips shown are search-driven
+  await fetchOpenTabs();
+
+  const byUrl = new Map();
+  for (const t of openTabs) {
+    if (!t.url) continue;
+    const cur = byUrl.get(t.url) || { audible: false, muted: false };
+    cur.audible = cur.audible || t.audible;
+    cur.muted   = cur.muted   || t.muted;
+    byUrl.set(t.url, cur);
+  }
+
+  const chipUrls = new Set();
+  document.querySelectorAll('.page-chip[data-action="focus-tab"]').forEach(chip => {
+    chipUrls.add(chip.dataset.tabUrl);
+  });
+
+  // A rendered URL with no live tab behind it means tabs were closed —
+  // refreshChipStateForUrl can't remove chips, so render instead
+  for (const url of chipUrls) {
+    if (url && !byUrl.has(url)) { renderDashboard(); return; }
+  }
+
+  for (const [url, st] of byUrl) {
+    refreshChipStateForUrl(url, { audibleNow: st.audible, mutedNow: st.muted });
+  }
+  renderOpenTabsSummary();
+}
+
+/**
+ * refreshGroupBadges()
+ *
+ * In-place sync of native-group badges after tabGroups.onUpdated (a
+ * rename/recolor while the dashboard is open). Rebuilds only the badge
+ * span inside each chip — chips themselves carry no entrance animation,
+ * so nothing flashes. Falls back to a full render if a chip's URL is
+ * gone entirely (same structural rule as syncAudioChipStates).
+ */
+async function refreshGroupBadges() {
+  await fetchOpenTabs();
+
+  const groupIdByUrl = new Map();
+  for (const t of openTabs) {
+    if (t.url) groupIdByUrl.set(t.url, t.groupId);
+  }
+
+  const chips = document.querySelectorAll('.page-chip[data-action="focus-tab"]');
+  for (const chip of chips) {
+    const url = chip.dataset.tabUrl;
+    if (url && !groupIdByUrl.has(url)) { renderDashboard(); return; }
+
+    const gid  = groupIdByUrl.get(url);
+    const meta = (gid !== undefined && gid !== -1) ? tabGroupMeta.get(gid) : null;
+    const cur  = chip.querySelector('.chip-group-badge');
+
+    if (!meta) {
+      cur?.remove();
+      continue;
+    }
+
+    const tpl = document.createElement('template');
+    tpl.innerHTML = groupBadgeHtml({ groupId: gid });
+    const fresh = tpl.content.firstElementChild;
+    if (!fresh) continue;
+    if (cur) {
+      cur.replaceWith(fresh);
+    } else {
+      // No badge yet: it lives right before the audio button (or the
+      // actions row when no speaker is showing)
+      const anchor = chip.querySelector('.chip-audio') || chip.querySelector('.chip-actions');
+      chip.insertBefore(fresh, anchor || null);
+    }
+  }
+}
+
+/**
  * groupBadgeHtml(tab)
  *
  * Colored-dot + name pill for chips that belong to a native Chrome
@@ -1328,7 +1448,6 @@ async function renderStaticDashboard() {
   domainGroups = Object.values(groupMap).sort((a, b) => b.tabs.length - a.tabs.length);
 
   // --- Global search filter (data-level, before render) ---
-  let visibleTabsCount = realTabs.length;
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     domainGroups = domainGroups
@@ -1337,30 +1456,16 @@ async function renderStaticDashboard() {
         (t.url   || '').toLowerCase().includes(q)
       )}))
       .filter(g => g.tabs.length > 0);
-    visibleTabsCount = domainGroups.reduce((s, g) => s + g.tabs.length, 0);
   }
 
   // --- Render domain cards ---
   const openTabsSection      = document.getElementById('openTabsSection');
   const openTabsMissionsEl   = document.getElementById('openTabsMissions');
-  const openTabsSectionCount = document.getElementById('openTabsSectionCount');
   const openTabsSectionTitle = document.getElementById('openTabsSectionTitle');
 
   if (domainGroups.length > 0 && openTabsSection) {
     if (openTabsSectionTitle) openTabsSectionTitle.textContent = t('section.openTabs');
-    if (searchQuery) {
-      // While filtering, hide the bulk-close button — it would take hidden tabs with it
-      openTabsSectionCount.innerHTML = tCount('search.matches', visibleTabsCount, {
-        q: `\u201C${escapeHtml(searchQuery)}\u201D`,
-        sites: tCount('search.sites', domainGroups.length),
-      });
-    } else {
-      const playingCount = realTabs.filter(t => t.audible).length;
-      const playingBtn = playingCount > 0
-        ? ` &nbsp;&middot;&nbsp; <button class="action-btn" data-action="mute-all-playing" style="font-size:11px;padding:3px 10px;color:var(--accent-amber);">${ICONS.audioOn} ${escapeHtml(tCount('tabs.mutePlaying', playingCount))}</button>`
-        : '';
-      openTabsSectionCount.innerHTML = `${tCount('tabs.domainsLine', domainGroups.length)} &nbsp;&middot;&nbsp; <button class="action-btn close-tabs" data-action="close-all-open-tabs" style="font-size:11px;padding:3px 10px;">${ICONS.close} ${escapeHtml(tCount('tabs.closeAll', realTabs.length))}</button>${playingBtn}`;
-    }
+    renderOpenTabsSummary();
     openTabsMissionsEl.innerHTML = domainGroups.map(g => renderDomainCard(g)).join('');
     openTabsSection.style.display = 'block';
   } else if (openTabsSection) {
@@ -2667,24 +2772,32 @@ document.addEventListener('click', (e) => {
 
 
 // Keep speaker indicators live: audio starts/stops on background tabs
-// without the user touching anything. Some Chrome builds don't surface
-// audible transitions through onUpdated changeInfo, so we also poll a
-// cheap audible/muted signature and re-render only when it changes.
+// without the user touching anything. Audible/muted flips reconcile
+// chips in place (syncAudioChipStates) — a full renderDashboard() here
+// would replay the entrance stagger on cards 1–4, which in the
+// columnated .missions layout is exactly the first column, and read as
+// the grid flashing. Some Chrome builds don't surface audible
+// transitions through onUpdated changeInfo, so we also poll a cheap
+// audible/muted signature and sync only when it changes.
 let audioRefreshTimer = null;
 let audioSignature   = '';
 function scheduleAudioRefresh() {
   clearTimeout(audioRefreshTimer);
-  audioRefreshTimer = setTimeout(() => renderDashboard(), 300);
+  audioRefreshTimer = setTimeout(() => syncAudioChipStates(), 300);
 }
 chrome.tabs.onUpdated.addListener((tabId, info) => {
   if (!('audible' in info) && !('mutedInfo' in info)) return;
   scheduleAudioRefresh();
 });
 
-// Renaming / recoloring / grouping while the dashboard is open should
-// show up without waiting for the next render cycle
+// Renaming / recoloring while the dashboard is open shows up without
+// waiting for the next render cycle — badges repaint in place
+let groupRefreshTimer = null;
 if (chrome.tabGroups?.onUpdated) {
-  chrome.tabGroups.onUpdated.addListener(() => scheduleAudioRefresh());
+  chrome.tabGroups.onUpdated.addListener(() => {
+    clearTimeout(groupRefreshTimer);
+    groupRefreshTimer = setTimeout(() => refreshGroupBadges(), 300);
+  });
 }
 
 setInterval(async () => {
@@ -2699,9 +2812,9 @@ setInterval(async () => {
     if (sig !== audioSignature) {
       const hadAudio = audioSignature.includes('A');
       audioSignature = sig;
-      // Skip the very first run's guaranteed-mismatch full redraw unless
-      // any audio state exists either way (cheap anyway, but be tidy)
-      if (hadAudio || sig.includes('A')) renderDashboard();
+      // Skip the very first run's guaranteed-mismatch sync unless any
+      // audio state exists either way (cheap anyway, but be tidy)
+      if (hadAudio || sig.includes('A')) syncAudioChipStates();
     }
   } catch {}
 }, 4000);
